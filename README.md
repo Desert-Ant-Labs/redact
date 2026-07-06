@@ -15,9 +15,9 @@ r.items.first?.original   // "Anna"
 - Runs fully on-device using Core ML; text never leaves the device
 - Detects 20 categories: names, addresses, emails, phone numbers, credit cards, IBANs, national IDs, and more
 - Supports all 24 official EU languages (Latin, Greek, and Cyrillic scripts)
-- Validates structured fields with a dependency-free layer: Luhn credit cards, mod-97 IBANs, and checksummed IDs
+- Validates structured fields with a dependency-free layer: Luhn cards, ISO-13616 IBANs, checksummed national IDs for all 24 EU countries, all 27 EU VAT numbers, IMEI, and per-country driving licences
 - Reversible redaction with unique, numbered placeholders for safe LLM round-trips
-- Bundled 4-bit Core ML model and tokenizer are about 12 MB
+- Bundled 4-bit Core ML model and tokenizer are about 13 MB
 - No network access required
 
 ## Installation
@@ -25,7 +25,7 @@ r.items.first?.original   // "Anna"
 Add this package to your app with Swift Package Manager.
 
 ```swift
-.package(url: "https://github.com/Desert-Ant-Labs/redact-swift.git", from: "0.1.0")
+.package(url: "https://github.com/Desert-Ant-Labs/redact-swift.git", from: "0.2.0")
 ```
 
 Then add the `Redact` product to your app target.
@@ -119,7 +119,7 @@ A SwiftUI example is included in `Examples/RedactExample`. Pick a sample or type
 
 ## How it works
 
-A tiny 6-layer multilingual token classifier (Core ML, 4-bit) handles contextual PII (names, streets, messy natural-language data) while a dependency-free deterministic layer owns the structured fields with real validation: Luhn credit cards, mod-97 IBANs, checksummed IDs, plus portable recognizers for US street addresses, `City, ST ZIP` state codes, and apartment/unit designators. The two are reconciled so the checksummed rules win where they fire and the model owns everything else. It mirrors the Python training pipeline exactly.
+A tiny 6-layer multilingual token classifier (Core ML, 4-bit) handles contextual PII (names, streets, messy natural-language data) while a dependency-free deterministic layer owns the structured fields with real validation: Luhn cards, ISO-13616 IBANs, BIC/VIN, checksum-validated national IDs for all 24 EU countries, all 27 EU VAT numbers, IMEI, and per-country driving-licence numbers, plus portable recognizers for street addresses, `City, ST ZIP` state codes, and apartment/unit designators. The two are reconciled so the checksummed rules win where they fire and the model owns everything else. It mirrors the Python training pipeline exactly (span-for-span parity).
 
 ## Requirements
 

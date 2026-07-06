@@ -1,7 +1,7 @@
 [
   {
     "metadataOutputVersion" : "3.0",
-    "storagePrecision" : "Mixed (Float16, Palettized (4 bits), UInt4)",
+    "storagePrecision" : "Mixed (Float16, Int4)",
     "outputSchema" : [
       {
         "hasShapeFlexibility" : "0",
@@ -20,10 +20,9 @@
     "specificationVersion" : 9,
     "mlProgramOperationTypeHistogram" : {
       "Ios18.linear" : 37,
-      "Ios18.constexprLutToDense" : 39,
-      "Ios18.expandDims" : 2,
-      "Select" : 2,
       "Ios18.sub" : 1,
+      "Select" : 2,
+      "Ios18.expandDims" : 2,
       "Ios18.matmul" : 12,
       "Ios18.gather" : 3,
       "Ios18.gelu" : 6,
@@ -32,6 +31,7 @@
       "Ios18.layerNorm" : 13,
       "Ios18.cast" : 7,
       "Ios18.transpose" : 24,
+      "Ios18.constexprBlockwiseShiftScale" : 39,
       "Ios18.reshape" : 24,
       "Ios18.greaterEqual" : 2,
       "Ios18.mul" : 7
@@ -53,8 +53,8 @@
       "name" : "MLModelType_mlProgram"
     },
     "userDefinedMetadata" : {
-      "com.github.apple.coremltools.conversion_date" : "2026-07-03",
-      "com.github.apple.coremltools.source" : "torch==2.7.0+cu126",
+      "com.github.apple.coremltools.conversion_date" : "2026-07-06",
+      "com.github.apple.coremltools.source" : "torch==2.12.1+cu130",
       "com.github.apple.coremltools.version" : "9.0",
       "com.github.apple.coremltools.source_dialect" : "TorchScript"
     },
