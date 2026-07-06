@@ -45,13 +45,13 @@ final class Model: @unchecked Sendable {
         return try MLModel(contentsOf: url, configuration: config)
     }
 
-    // MARK: public entry — full hybrid detection
+    // MARK: public entry - full hybrid detection
     func detect(_ text: String, minScore: Double) throws -> [Span] {
         let det = Deterministic.detect(text, enabled: Deterministic.owned)
         let masked = Pipeline.maskText(text, det)
         let ml = try mlSpans(masked, minScore: minScore)
         let corr = Deterministic.detect(text, enabled: ["PHONE"]).filter { !Deterministic.owned.contains($0.label) }
-        return Pipeline.resolve(det + corr, ml)
+        return Pipeline.cleanSpans(text, Pipeline.relabelByContext(text, Pipeline.resolve(det + corr, ml)))
     }
 
     // MARK: neural spans (windowed)
