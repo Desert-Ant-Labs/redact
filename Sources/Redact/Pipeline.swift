@@ -1,6 +1,6 @@
 import Foundation
 
-/// Portable span post-processing — a direct port of `redact_training.pipeline`
+/// Portable span post-processing - a direct port of `redact_training.pipeline`
 /// (and the demo's `pipeline.mjs`): BIOES decoding, word snapping, name
 /// bridging, address/state/unit recognizers, and the deterministic-owner merge.
 enum Pipeline {
@@ -241,6 +241,54 @@ enum Pipeline {
             out.append(Span(s, e, "SECONDARY_ADDRESS"))
         }
         return mergeSameLabel(out).sorted { $0.start != $1.start ? $0.start < $1.start : $0.end < $1.end }
+    }
+
+    // MARK: final label / text tidy (mirrors pipeline.py relabel_by_context + clean_spans)
+    private static let trimTrail = Set(" \t\n\r.,;:!?)]}\"\u{00bb}\u{2019}\u{201d}'")
+    private static let trimLead = Set(" \t\n\r([{\"\u{00ab}\u{2018}\u{201c}")
+    private static let acctLeft = rx(#"(?:\ba/?c\b|acct|account|konto|compte|cuenta|rekening|conta|\biban\b)\W{0,4}#?\s*$"#, [.caseInsensitive])
+    private static let stripTitles: Set<String> = ["mr", "mrs", "ms", "miss", "mx", "master", "mstr", "dr", "prof", "professor", "doctor", "dear", "sir", "madam", "madame", "monsieur", "mme", "mlle", "herr", "frau", "fraulein", "frl", "mevrouw", "dhr", "signor", "signora"]
+    private static let titleRE = rx(#"^(\S+)\s+"#)
+    private static let titleTrim = CharacterSet(charactersIn: ".'\u{2019}")
+    private static let coreTrim = CharacterSet(charactersIn: ".'\u{2019} ")
+
+    static func relabelByContext(_ text: String, _ spans: [Span]) -> [Span] {
+        let t = UTF16Text(text)
+        return spans.map { s in
+            var lab = s.label
+            let left = t.slice(max(0, s.start - 28), s.start).lowercased()
+            if lab == "PHONE", acctLeft.matches(left) {
+                lab = "BANK_ACCOUNT"
+            } else if lab == "GOVERNMENT_ID", (left.contains("driv") && left.contains("licen"))
+                || left.contains("f\u{00fc}hrerschein") || left.contains("fuhrerschein")
+                || left.contains("rijbewijs") || (left.contains("permis") && left.contains("conduire")) {
+                lab = "DRIVERS_LICENSE"
+            }
+            return Span(s.start, s.end, lab, s.score)
+        }
+    }
+
+    static func cleanSpans(_ text: String, _ spans: [Span]) -> [Span] {
+        let t = UTF16Text(text)
+        var out: [Span] = []
+        for s in spans {
+            var st = s.start, en = s.end
+            while en > st, let c = t.scalar(at: en - 1), trimTrail.contains(Character(c)) { en -= 1 }
+            while st < en, let c = t.scalar(at: st), trimLead.contains(Character(c)) { st += 1 }
+            if nameFamilies.contains(s.label) {
+                while st < en {
+                    let seg = t.slice(st, en)
+                    guard let m = titleRE.firstMatch(in: seg, range: NSRange(location: 0, length: (seg as NSString).length)) else { break }
+                    let g1 = (seg as NSString).substring(with: m.range(at: 1))
+                    if !stripTitles.contains(g1.trimmingCharacters(in: titleTrim).lowercased()) { break }
+                    st += m.range(at: 0).length
+                }
+                let core = t.slice(st, en).trimmingCharacters(in: coreTrim)
+                if core.isEmpty || stripTitles.contains(core.lowercased()) { continue }
+            }
+            if en > st { out.append(Span(st, en, s.label, s.score)) }
+        }
+        return out
     }
 
     // MARK: hysteresis

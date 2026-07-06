@@ -7,9 +7,9 @@
         "hasShapeFlexibility" : "0",
         "isOptional" : "0",
         "dataType" : "Float16",
-        "formattedType" : "MultiArray (Float16 1 × 256 × 81)",
+        "formattedType" : "MultiArray (Float16 1 × 256 × 85)",
         "shortDescription" : "",
-        "shape" : "[1, 256, 81]",
+        "shape" : "[1, 256, 85]",
         "name" : "logits",
         "type" : "MultiArray"
       }
@@ -53,8 +53,8 @@
       "name" : "MLModelType_mlProgram"
     },
     "userDefinedMetadata" : {
-      "com.github.apple.coremltools.conversion_date" : "2026-07-03",
-      "com.github.apple.coremltools.source" : "torch==2.7.0+cu126",
+      "com.github.apple.coremltools.conversion_date" : "2026-07-07",
+      "com.github.apple.coremltools.source" : "torch==2.7.1+cu126",
       "com.github.apple.coremltools.version" : "9.0",
       "com.github.apple.coremltools.source_dialect" : "TorchScript"
     },
