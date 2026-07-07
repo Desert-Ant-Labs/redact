@@ -1,0 +1,19 @@
+{
+  "name": "redactwasmexample",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "^0.3.0",
+    "onnxruntime-node": "^1.20.0",
+    "onnxruntime-web": "^1.20.0",
+    "playwright": "^1.61.1"
+  }
+}

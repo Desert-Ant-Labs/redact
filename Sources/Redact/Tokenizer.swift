@@ -1,4 +1,6 @@
+#if !os(WASI)
 import Foundation
+#endif
 
 /// XLM-R SentencePiece **Unigram** tokenizer, ported to pure Swift and verified
 /// to reproduce the training tokenizer's ids exactly (NFKC normalization, no
@@ -23,8 +25,7 @@ struct Tokenizer {
 
     private static let metaspace: Unicode.Scalar = "\u{2581}"  // ▁
 
-    init?(data: Data) {
-        let b = [UInt8](data)
+    init?(bytes b: [UInt8]) {
         guard b.count >= 21, b[0] == 0x52, b[1] == 0x44, b[2] == 0x54, b[3] == 0x4B else { return nil } // "RDTK"
         var off = 5
         func i32() -> Int {
@@ -66,8 +67,14 @@ struct Tokenizer {
     /// Tokenize `text` into content sub-words (no `<s>` / `</s>`), Viterbi-optimal
     /// over the unigram vocabulary.
     func tokenize(_ text: String) -> [Token] {
-        let normalized = "\u{2581}" + text.precomposedStringWithCompatibilityMapping
-            .replacingOccurrences(of: " ", with: "\u{2581}")
+        #if os(WASI)
+        // No ICU in the wasm build: NFKC via the host JS engine (JSEngine).
+        let nfkc = JSEngine.nfkc(text)
+        #else
+        let nfkc = text.precomposedStringWithCompatibilityMapping
+        #endif
+        let normalized = "\u{2581}" + String(String.UnicodeScalarView(
+            nfkc.unicodeScalars.map { $0 == " " ? "\u{2581}" : $0 }))
         let s = Array(normalized.unicodeScalars)
         let n = s.count
         if n == 0 { return [] }

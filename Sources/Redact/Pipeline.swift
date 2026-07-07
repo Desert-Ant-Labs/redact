@@ -1,4 +1,6 @@
+#if !os(WASI)
 import Foundation
+#endif
 
 /// Portable span post-processing - a direct port of `redact_training.pipeline`
 /// (and the demo's `pipeline.mjs`): BIOES decoding, word snapping, name
@@ -24,7 +26,7 @@ enum Pipeline {
     private static let usStreetRE = rx(
         #"\b(\d{1,6}[A-Za-z]?)\s+((?:[A-Z][A-Za-z0-9.'’-]*\s+){0,4}(?:Street|Avenue|Boulevard|Road|Lane|Drive|Court|Place|Terrace|Circle|Highway|Parkway|Square|Trail|Crescent|Alley|Loop|Way|St|Ave|Blvd|Rd|Ln|Dr|Ct|Pl|Ter|Cir|Hwy|Pkwy|Sq|Trl|Aly))\b\.?(?=$|[\s,.;:)])"#)
     private static let stateZipRE = rx(#"(?:,\s*|\s)([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b"#)
-    private static let secAddrRE = rx(#"\b(?:Apartment|Apt|Suite|Ste|Unit|Building|Bldg|Floor|Fl|Room|Rm|Department|Dept|Trailer|Trlr|Space|Spc|Lot)\.?\s*#?\s*(?:\d{1,4}[A-Za-z]?|[A-Za-z]\d{1,4})\b"#, [.caseInsensitive])
+    private static let secAddrRE = rx(#"\b(?:Apartment|Apt|Suite|Ste|Unit|Building|Bldg|Floor|Fl|Room|Rm|Department|Dept|Trailer|Trlr|Space|Spc|Lot)\.?\s*#?\s*(?:\d{1,4}[A-Za-z]?|[A-Za-z]\d{1,4})\b"#, ci: true)
     private static let bnumAfterRE = rx(#"^[\s,]{0,2}(\d{1,5}[a-zA-Z]?(?:[-/]\d{1,4}[a-zA-Z]?)?)\b"#)
     private static let bnumBeforeRE = rx(#"(\d{1,5}[a-zA-Z]?)[\s,]{0,2}$"#)
     private static let nextTokenRE = rx(#"^(\s+)([^\s,.;:!?)\]}"]+)"#)
@@ -32,9 +34,15 @@ enum Pipeline {
 
     // MARK: helpers
     private static func isUpperLike(_ c: Character) -> Bool { String(c) == String(c).uppercased() }
-    private static func trimEdges(_ s: String) -> String {
-        s.trimmingCharacters(in: CharacterSet(charactersIn: ".'\u{2019}-"))
+    /// Trim characters from both ends (portable stand-in for CharacterSet trimming).
+    static func trim(_ s: String, _ set: Set<Character>) -> String {
+        var chars = Array(s)
+        while let f = chars.first, set.contains(f) { chars.removeFirst() }
+        while let l = chars.last, set.contains(l) { chars.removeLast() }
+        return String(chars)
     }
+    private static let edgeTrim: Set<Character> = [".", "'", "\u{2019}", "-"]
+    private static func trimEdges(_ s: String) -> String { trim(s, edgeTrim) }
 
     // MARK: BIOES → spans
     static func bioesToSpans(_ tags: [String], _ offsets: [(Int, Int)]) -> [Span] {
@@ -131,8 +139,8 @@ enum Pipeline {
 
     // MARK: name gaps / particles
     private static func gapIsNameLike(_ gap: String) -> Bool {
-        if gap.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
-        if (gap as NSString).length > 20 || badGapRE.matches(gap) { return false }
+        if gap.allSatisfy({ $0.isWhitespace }) { return false }
+        if gap.utf16.count > 20 || badGapRE.test(gap) { return false }
         for tok in gap.split(whereSeparator: { $0 == " " || $0.isWhitespace }) {
             let w = trimEdges(String(tok))
             if w.isEmpty { continue }
@@ -166,10 +174,9 @@ enum Pipeline {
                 var pos = sp.end
                 while true {
                     let rest = t.slice(pos, t.length)
-                    guard let m = nextTokenRE.firstMatch(in: rest, range: NSRange(location: 0, length: (rest as NSString).length)) else { break }
-                    let mns = rest as NSString
-                    let tok = mns.substring(with: m.range(at: 2))
-                    let whole = m.range(at: 0).length
+                    guard let m = nextTokenRE.first(rest) else { break }
+                    let tok = m.group(2)!
+                    let whole = m.end - m.start
                     let low = trimEdges(tok).lowercased()
                     if allParticles.contains(low) { pos += whole; consumed = true; continue }
                     if consumed, let f = tok.first, isUpperLike(f), String(f) != String(f).lowercased() { pos += whole }
@@ -189,14 +196,14 @@ enum Pipeline {
         func free(_ a: Int, _ b: Int) -> Bool { !occ.contains { $0.0 < b && a < $0.1 } }
         for s in spans where s.label == "STREET_NAME" {
             let after = t.slice(s.end, t.length)
-            if let m = bnumAfterRE.firstMatch(in: after, range: NSRange(location: 0, length: (after as NSString).length)) {
-                let g = m.range(at: 1); let a = s.end + g.location, b = a + g.length
+            if let m = bnumAfterRE.first(after), let g = m.range(at: 1) {
+                let a = s.end + g.start, b = s.end + g.end
                 if free(a, b) { out.append(Span(a, b, "BUILDING_NUMBER")); occ.append((a, b)) }
             }
             let base = max(0, s.start - 8)
             let before = t.slice(base, s.start)
-            if let m = bnumBeforeRE.firstMatch(in: before, range: NSRange(location: 0, length: (before as NSString).length)) {
-                let g = m.range(at: 1); let a = base + g.location, b = a + g.length
+            if let m = bnumBeforeRE.first(before), let g = m.range(at: 1) {
+                let a = base + g.start, b = base + g.end
                 if free(a, b) { out.append(Span(a, b, "BUILDING_NUMBER")); occ.append((a, b)) }
             }
         }
@@ -205,13 +212,11 @@ enum Pipeline {
 
     static func redactUsStreet(_ t: UTF16Text, _ spans: [Span]) -> [Span] {
         var out = spans
-        for m in usStreetRE.matches(t.ns) {
-            let bn = m.range(at: 1), st0 = m.range(at: 2)
-            let bnS = bn.location, bnE = bn.location + bn.length
-            let stS = st0.location, stE = st0.location + st0.length
-            out.removeAll { ($0.label == "STREET_NAME" || $0.label == "BUILDING_NUMBER") && max($0.start, bnS) < min($0.end, stE) }
-            out.append(Span(bnS, bnE, "BUILDING_NUMBER"))
-            out.append(Span(stS, stE, "STREET_NAME"))
+        for m in usStreetRE.allMatches(t.string) {
+            guard let bn = m.range(at: 1), let st0 = m.range(at: 2) else { continue }
+            out.removeAll { ($0.label == "STREET_NAME" || $0.label == "BUILDING_NUMBER") && max($0.start, bn.start) < min($0.end, st0.end) }
+            out.append(Span(bn.start, bn.end, "BUILDING_NUMBER"))
+            out.append(Span(st0.start, st0.end, "STREET_NAME"))
         }
         return mergeSameLabel(out).sorted { $0.start != $1.start ? $0.start < $1.start : $0.end < $1.end }
     }
@@ -222,12 +227,11 @@ enum Pipeline {
         func add(_ a: Int, _ b: Int, _ label: String) {
             if !occ.contains(where: { $0.0 < b && a < $0.1 }) { out.append(Span(a, b, label)); occ.append((a, b)) }
         }
-        for m in stateZipRE.matches(t.ns) {
-            let sr = m.range(at: 1), zr = m.range(at: 2)
-            let code = t.ns.substring(with: sr)
-            if usStates.contains(code) {
-                add(sr.location, sr.location + sr.length, "STATE")
-                add(zr.location, zr.location + zr.length, "ZIP_CODE")
+        for m in stateZipRE.allMatches(t.string) {
+            guard let sr = m.range(at: 1), let zr = m.range(at: 2) else { continue }
+            if usStates.contains(m.group(1)!) {
+                add(sr.start, sr.end, "STATE")
+                add(zr.start, zr.end, "ZIP_CODE")
             }
         }
         return mergeSameLabel(out).sorted { $0.start != $1.start ? $0.start < $1.start : $0.end < $1.end }
@@ -235,8 +239,8 @@ enum Pipeline {
 
     static func redactSecondaryAddress(_ t: UTF16Text, _ spans: [Span]) -> [Span] {
         var out = spans
-        for m in secAddrRE.matches(t.ns) {
-            let s = m.range(at: 0).location, e = s + m.range(at: 0).length
+        for m in secAddrRE.allMatches(t.string) {
+            let s = m.start, e = m.end
             out.removeAll { ($0.label == "SECONDARY_ADDRESS" || $0.label == "BUILDING_NUMBER") && max($0.start, s) < min($0.end, e) }
             out.append(Span(s, e, "SECONDARY_ADDRESS"))
         }
@@ -246,18 +250,18 @@ enum Pipeline {
     // MARK: final label / text tidy (mirrors pipeline.py relabel_by_context + clean_spans)
     private static let trimTrail = Set(" \t\n\r.,;:!?)]}\"\u{00bb}\u{2019}\u{201d}'")
     private static let trimLead = Set(" \t\n\r([{\"\u{00ab}\u{2018}\u{201c}")
-    private static let acctLeft = rx(#"(?:\ba/?c\b|acct|account|konto|compte|cuenta|rekening|conta|\biban\b)\W{0,4}#?\s*$"#, [.caseInsensitive])
+    private static let acctLeft = rx(#"(?:\ba/?c\b|acct|account|konto|compte|cuenta|rekening|conta|\biban\b)\W{0,4}#?\s*$"#, ci: true)
     private static let stripTitles: Set<String> = ["mr", "mrs", "ms", "miss", "mx", "master", "mstr", "dr", "prof", "professor", "doctor", "dear", "sir", "madam", "madame", "monsieur", "mme", "mlle", "herr", "frau", "fraulein", "frl", "mevrouw", "dhr", "signor", "signora"]
     private static let titleRE = rx(#"^(\S+)\s+"#)
-    private static let titleTrim = CharacterSet(charactersIn: ".'\u{2019}")
-    private static let coreTrim = CharacterSet(charactersIn: ".'\u{2019} ")
+    private static let titleTrim: Set<Character> = [".", "'", "\u{2019}"]
+    private static let coreTrim: Set<Character> = [".", "'", "\u{2019}", " "]
 
     static func relabelByContext(_ text: String, _ spans: [Span]) -> [Span] {
         let t = UTF16Text(text)
         return spans.map { s in
             var lab = s.label
             let left = t.slice(max(0, s.start - 28), s.start).lowercased()
-            if lab == "PHONE", acctLeft.matches(left) {
+            if lab == "PHONE", acctLeft.test(left) {
                 lab = "BANK_ACCOUNT"
             } else if lab == "GOVERNMENT_ID", (left.contains("driv") && left.contains("licen"))
                 || left.contains("f\u{00fc}hrerschein") || left.contains("fuhrerschein")
@@ -278,12 +282,12 @@ enum Pipeline {
             if nameFamilies.contains(s.label) {
                 while st < en {
                     let seg = t.slice(st, en)
-                    guard let m = titleRE.firstMatch(in: seg, range: NSRange(location: 0, length: (seg as NSString).length)) else { break }
-                    let g1 = (seg as NSString).substring(with: m.range(at: 1))
-                    if !stripTitles.contains(g1.trimmingCharacters(in: titleTrim).lowercased()) { break }
-                    st += m.range(at: 0).length
+                    guard let m = titleRE.first(seg) else { break }
+                    let g1 = m.group(1)!
+                    if !stripTitles.contains(trim(g1, titleTrim).lowercased()) { break }
+                    st += m.end - m.start
                 }
-                let core = t.slice(st, en).trimmingCharacters(in: coreTrim)
+                let core = trim(t.slice(st, en), coreTrim)
                 if core.isEmpty || stripTitles.contains(core.lowercased()) { continue }
             }
             if en > st { out.append(Span(st, en, s.label, s.score)) }
@@ -296,7 +300,7 @@ enum Pipeline {
         let (lo, hi) = a.start <= b.start ? (a, b) : (b, a)
         if hi.start < lo.end { return true }
         let gap = t.slice(lo.end, hi.start)
-        return (gap.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (gap as NSString).length <= 3) || gapIsNameLike(gap)
+        return (gap.allSatisfy({ $0.isWhitespace }) && gap.utf16.count <= 3) || gapIsNameLike(gap)
     }
 
     static func hysteresis(_ t: UTF16Text, _ scored: [(Span, Double)], _ high: Double) -> [Span] {
@@ -344,6 +348,6 @@ enum Pipeline {
                 units[i] = space
             }
         }
-        return String(utf16CodeUnits: units, count: units.count)
+        return String(decoding: units, as: UTF16.self)
     }
 }

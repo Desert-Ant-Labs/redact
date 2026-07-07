@@ -1,5 +1,6 @@
 import XCTest
 @testable import Redact
+import RedactResources
 
 final class RedactTests: XCTestCase {
     // MARK: deterministic recognizers (no model needed)
@@ -44,8 +45,8 @@ final class RedactTests: XCTestCase {
     }
 
     func testTokenizerLoads() throws {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "redact_tokenizer", withExtension: "bin"))
-        let tok = try XCTUnwrap(Tokenizer(data: try Data(contentsOf: url)))
+        let url = try XCTUnwrap(RedactResourcesBundle.bundle.url(forResource: "redact_tokenizer", withExtension: "bin"))
+        let tok = try XCTUnwrap(Tokenizer(bytes: [UInt8](try Data(contentsOf: url))))
         XCTAssertEqual(tok.bosID, 0)
         XCTAssertEqual(tok.eosID, 2)
         XCTAssertFalse(tok.tokenize("Contact Anna Kovács in Berlin").isEmpty)

@@ -1,4 +1,6 @@
+#if !os(WASI)
 import Foundation
+#endif
 
 /// A redaction: text with unique placeholders, plus the mapping needed to
 /// inspect the detections and restore the originals after out-of-band
@@ -36,7 +38,7 @@ public struct Redaction: Sendable {
     /// prefix of one another — restoration is order-independent and safe.
     public func restore(_ processed: String) -> String {
         var out = processed
-        for item in items { out = out.replacingOccurrences(of: item.placeholder, with: item.original) }
+        for item in items { out = out.replacing(item.placeholder, with: item.original) }
         return out
     }
 }
@@ -56,6 +58,13 @@ public struct Options: Sendable {
 }
 
 /// Errors thrown while loading or running the bundled model.
+/// (`LocalizedError` is Foundation-only, so it is skipped on WASI.)
+#if os(WASI)
+public enum RedactError: Error, Sendable {
+    case resourceMissing
+    case predictionFailed
+}
+#else
 public enum RedactError: Error, LocalizedError, Sendable {
     case resourceMissing
     case predictionFailed
@@ -67,6 +76,7 @@ public enum RedactError: Error, LocalizedError, Sendable {
         }
     }
 }
+#endif
 
 /// On-device, multilingual PII redaction.
 ///
@@ -98,7 +108,7 @@ public final class Redact: @unchecked Sendable {
     /// range); and ``Redaction/restore(_:)`` fills the originals back in.
     public func redaction(of text: String, options: Options = .init()) async throws -> Redaction {
         let model = try await modelTask.value
-        let spans = try model.detect(text, minScore: options.minimumConfidence)
+        let spans = try await model.detect(text, minScore: options.minimumConfidence)
             .sorted { $0.start != $1.start ? $0.start < $1.start : $0.end < $1.end }
         let units = Array(text.utf16)
         var counts: [Label: Int] = [:]
@@ -113,7 +123,7 @@ public final class Redact: @unchecked Sendable {
             let n = (counts[label] ?? 0) + 1
             counts[label] = n
             let placeholder = "[\(label.rawValue)_\(n)]"
-            let original = String(utf16CodeUnits: Array(units[s..<e]), count: e - s)
+            let original = String(decoding: units[s..<e], as: UTF16.self)
             let range = String.Index(utf16Offset: s, in: text)..<String.Index(utf16Offset: e, in: text)
             items.append(.init(label: label, original: original, placeholder: placeholder,
                                confidence: span.score, range: range))
@@ -122,6 +132,6 @@ public final class Redact: @unchecked Sendable {
             last = e
         }
         out.append(contentsOf: units[last...])
-        return Redaction(redactedText: String(utf16CodeUnits: out, count: out.count), items: items)
+        return Redaction(redactedText: String(decoding: out, as: UTF16.self), items: items)
     }
 }

@@ -1,11 +1,16 @@
-import CoreML
+#if os(WASI)
+import WASILibc
+#else
 import Foundation
+import RedactResources
+#endif
 
-/// Loads the bundled Core ML token classifier + tokenizer and runs the full
-/// hybrid detection pipeline. Owns Core ML I/O, windowing, BIOES decoding, and
-/// the deterministic-owner merge.
+/// Loads the bundled token classifier + tokenizer and runs the full hybrid
+/// detection pipeline: windowing, BIOES decoding, and the deterministic-owner
+/// merge. Inference itself is delegated to the platform `InferenceEngine`
+/// (Core ML on Apple platforms, ONNX Runtime on Android/Linux).
 final class Model: @unchecked Sendable {
-    private let mlmodel: MLModel
+    private let engine: InferenceEngine
     private let tokenizer: Tokenizer
     private let id2label: [Int: String]
 
@@ -13,49 +18,55 @@ final class Model: @unchecked Sendable {
     private static let maxContent = seq - 2      // room for <s> … </s>
     private static let lowScore = 0.3
     private static let metaspace: Character = "\u{2581}"
-    // position_ids baked at Core ML export time: arange(pad+1, pad+1+seq).
-    private static let positionIDs: [Int32] = (0..<seq).map { Int32(2 + $0) }
 
     init() throws {
+        #if os(WASI)
+        // No filesystem in the browser: the JS host injects the tokenizer and
+        // label map (and runs the ONNX model) via globals. See JSEngine.
         guard
-            let tokURL = Bundle.module.url(forResource: "redact_tokenizer", withExtension: "bin"),
-            let labURL = Bundle.module.url(forResource: "labels", withExtension: "json"),
-            let tok = Tokenizer(data: try Data(contentsOf: tokURL))
+            let tokBytes = JSEngine.tokenizerBytes(),
+            let tok = Tokenizer(bytes: tokBytes),
+            let labels = JSEngine.labelMap()
         else { throw RedactError.resourceMissing }
         tokenizer = tok
+        id2label = labels
+        engine = try JSEngine()
+        #else
+        let bundle = RedactResourcesBundle.bundle
+        guard
+            let tokURL = bundle.url(forResource: "redact_tokenizer", withExtension: "bin"),
+            let labURL = bundle.url(forResource: "labels", withExtension: "json"),
+            let tok = Tokenizer(bytes: [UInt8](try Data(contentsOf: tokURL)))
+        else { throw RedactError.resourceMissing }
+        tokenizer = tok
+        let labelData = try Data(contentsOf: labURL)
 
         struct Labels: Decodable { let id2label: [String: String] }
-        let labels = try JSONDecoder().decode(Labels.self, from: Data(contentsOf: labURL))
+        let labels = try JSONDecoder().decode(Labels.self, from: labelData)
         id2label = Dictionary(uniqueKeysWithValues: labels.id2label.compactMap { k, v in Int(k).map { ($0, v) } })
 
-        let config = MLModelConfiguration()
-        #if targetEnvironment(simulator)
-        config.computeUnits = .cpuOnly
+        #if canImport(CoreML)
+        engine = try CoreMLEngine()
         #else
-        config.computeUnits = .all
-        #endif
-        mlmodel = try Model.loadCoreML(config: config)
-    }
-
-    private static func loadCoreML(config: MLModelConfiguration) throws -> MLModel {
-        // Ships a precompiled Core ML model (redact.mlmodelc).
-        guard let url = Bundle.module.url(forResource: "redact", withExtension: "mlmodelc") else {
+        guard let onnxURL = bundle.url(forResource: "redact", withExtension: "onnx") else {
             throw RedactError.resourceMissing
         }
-        return try MLModel(contentsOf: url, configuration: config)
+        engine = try OrtEngine(modelPath: onnxURL.path)
+        #endif
+        #endif
     }
 
     // MARK: public entry - full hybrid detection
-    func detect(_ text: String, minScore: Double) throws -> [Span] {
+    func detect(_ text: String, minScore: Double) async throws -> [Span] {
         let det = Deterministic.detect(text, enabled: Deterministic.owned)
         let masked = Pipeline.maskText(text, det)
-        let ml = try mlSpans(masked, minScore: minScore)
+        let ml = try await mlSpans(masked, minScore: minScore)
         let corr = Deterministic.detect(text, enabled: ["PHONE"]).filter { !Deterministic.owned.contains($0.label) }
         return Pipeline.cleanSpans(text, Pipeline.relabelByContext(text, Pipeline.resolve(det + corr, ml)))
     }
 
     // MARK: neural spans (windowed)
-    private func mlSpans(_ text: String, minScore: Double) throws -> [Span] {
+    private func mlSpans(_ text: String, minScore: Double) async throws -> [Span] {
         let t = UTF16Text(text)
         let tokens = tokenizer.tokenize(text)
         let offsets = reconstructOffsets(t, tokens)
@@ -67,7 +78,7 @@ final class Model: @unchecked Sendable {
             let chunk = Array(tokens[i..<min(i + Model.maxContent, tokens.count)])
             if chunk.isEmpty { break }
             let chunkOffsets = Array(offsets[i..<i + chunk.count])
-            let (tags, tagOffsets, probs) = try runWindow(chunk, chunkOffsets)
+            let (tags, tagOffsets, probs) = try await runWindow(chunk, chunkOffsets)
             // score = max token prob overlapping each BIOES span (within this window)
             let usableTags = zip(tags, probs).map { $0.1 >= low ? $0.0 : "O" }
             for span in Pipeline.bioesToSpans(usableTags, tagOffsets) {
@@ -87,53 +98,28 @@ final class Model: @unchecked Sendable {
         return Pipeline.mergePriority(kept)
     }
 
-    /// Run one 256-wide window; returns (tags, offsets, probs) for its positions.
-    private func runWindow(_ chunk: [Tokenizer.Token], _ chunkOffsets: [(Int, Int)]) throws
+    /// Run one window (<= 256 incl. specials); returns (tags, offsets, probs).
+    private func runWindow(_ chunk: [Tokenizer.Token], _ chunkOffsets: [(Int, Int)]) async throws
         -> ([String], [(Int, Int)], [Double]) {
         let ids = [tokenizer.bosID] + chunk.map(\.id) + [tokenizer.eosID]
         let realLen = ids.count
         var offs: [(Int, Int)] = [(0, 0)] + chunkOffsets + [(0, 0)]
 
-        guard
-            let inIDs = try? MLMultiArray(shape: [1, NSNumber(value: Model.seq)], dataType: .int32),
-            let inMask = try? MLMultiArray(shape: [1, NSNumber(value: Model.seq)], dataType: .int32),
-            let inPos = try? MLMultiArray(shape: [1, NSNumber(value: Model.seq)], dataType: .int32),
-            let inType = try? MLMultiArray(shape: [1, NSNumber(value: Model.seq)], dataType: .int32)
-        else { throw RedactError.predictionFailed }
+        let (logits, numLabels) = try await engine.logits(ids: ids)
+        guard logits.count >= realLen * numLabels else { throw RedactError.predictionFailed }
 
-        let pIDs = inIDs.dataPointer.bindMemory(to: Int32.self, capacity: Model.seq)
-        let pMask = inMask.dataPointer.bindMemory(to: Int32.self, capacity: Model.seq)
-        let pPos = inPos.dataPointer.bindMemory(to: Int32.self, capacity: Model.seq)
-        let pType = inType.dataPointer.bindMemory(to: Int32.self, capacity: Model.seq)
-        for k in 0..<Model.seq {
-            pIDs[k] = k < realLen ? Int32(ids[k]) : 1        // <pad>
-            pMask[k] = k < realLen ? 1 : 0
-            pPos[k] = Model.positionIDs[k]
-            pType[k] = 0
-        }
-
-        let provider = try MLDictionaryFeatureProvider(dictionary: [
-            "input_ids": inIDs, "attention_mask": inMask,
-            "position_ids": inPos, "token_type_ids": inType,
-        ])
-        let out = try mlmodel.prediction(from: provider)
-        guard let logits = out.featureValue(for: "logits")?.multiArrayValue else { throw RedactError.predictionFailed }
-
-        let numLabels = logits.shape[2].intValue
         var tags = [String](repeating: "O", count: realLen)
         var probs = [Double](repeating: 0, count: realLen)
         for k in 0..<realLen {
-            var row = [Double](repeating: 0, count: numLabels)
             var mx = -Double.greatestFiniteMagnitude, top = 0
             for c in 0..<numLabels {
-                let v = logits[[0, NSNumber(value: k), NSNumber(value: c)] as [NSNumber]].doubleValue
-                row[c] = v
+                let v = Double(logits[k * numLabels + c])
                 if v > mx { mx = v; top = c }
             }
             var sum = 0.0
-            for v in row { sum += exp(v - mx) }
+            for c in 0..<numLabels { sum += exp(Double(logits[k * numLabels + c]) - mx) }
             tags[k] = id2label[top] ?? "O"
-            probs[k] = exp(row[top] - mx) / sum
+            probs[k] = exp(Double(logits[k * numLabels + top]) - mx) / sum
         }
         if offs.count > realLen { offs = Array(offs.prefix(realLen)) }
         return (tags, offs, probs)
@@ -149,13 +135,12 @@ final class Model: @unchecked Sendable {
             var scalars = tok.scalars
             if scalars.first == "\u{2581}" { scalars.removeFirst() }
             if scalars.isEmpty { out.append((cursor, cursor)); continue }
-            let core = String(String.UnicodeScalarView(scalars)) as NSString
-            let range = t.ns.range(of: core as String, options: [], range: NSRange(location: cursor, length: t.length - cursor))
-            if range.location == NSNotFound {
-                out.append((cursor, cursor))
+            let core = String(String.UnicodeScalarView(scalars))
+            if let r = t.find(core, from: cursor) {
+                out.append((r.start, r.end))
+                cursor = r.end
             } else {
-                out.append((range.location, range.location + range.length))
-                cursor = range.location + range.length
+                out.append((cursor, cursor))
             }
         }
         return out

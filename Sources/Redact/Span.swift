@@ -1,4 +1,6 @@
+#if !os(WASI)
 import Foundation
+#endif
 
 /// Internal span with UTF-16 offsets into the source string (matches the
 /// JavaScript/Python reference pipeline's indexing so the ports agree exactly).
@@ -14,15 +16,49 @@ struct Span {
 }
 
 /// UTF-16-indexed view over a string, providing the small set of operations the
-/// ported pipeline needs (character access, slicing, whitespace/word tests).
+/// ported pipeline needs (character access, slicing, whitespace/word tests,
+/// literal search). Backed by `NSString` natively and by a plain code-unit
+/// array on WebAssembly (no Foundation there).
 struct UTF16Text {
-    let ns: NSString
+    #if os(WASI)
+    let string: String
+    private let units: [UInt16]
+    var length: Int { units.count }
+
+    init(_ string: String) { self.string = string; units = Array(string.utf16) }
+
+    /// The Unicode scalar at UTF-16 index `i` (BMP; surrogate pairs read as their
+    /// leading unit - PII text is effectively all BMP).
+    func scalar(at i: Int) -> Unicode.Scalar? {
+        guard i >= 0, i < units.count else { return nil }
+        return Unicode.Scalar(units[i])
+    }
+
+    func slice(_ a: Int, _ b: Int) -> String {
+        let lo = max(0, min(a, units.count)), hi = max(0, min(b, units.count))
+        guard hi > lo else { return "" }
+        return String(decoding: units[lo..<hi], as: UTF16.self)
+    }
+
+    /// First literal occurrence of `needle` at or after UTF-16 offset `from`.
+    func find(_ needle: String, from: Int) -> (start: Int, end: Int)? {
+        let n = Array(needle.utf16)
+        guard !n.isEmpty, from <= units.count - n.count else { return nil }
+        outer: for i in max(0, from)...(units.count - n.count) {
+            for j in 0..<n.count where units[i + j] != n[j] { continue outer }
+            return (i, i + n.count)
+        }
+        return nil
+    }
+    #else
+    private let ns: NSString
+    var string: String { ns as String }
     var length: Int { ns.length }
 
     init(_ string: String) { ns = string as NSString }
 
     /// The Unicode scalar at UTF-16 index `i` (BMP; surrogate pairs read as their
-    /// leading unit — PII text is effectively all BMP).
+    /// leading unit - PII text is effectively all BMP).
     func scalar(at i: Int) -> Unicode.Scalar? {
         guard i >= 0, i < ns.length else { return nil }
         return Unicode.Scalar(ns.character(at: i))
@@ -33,6 +69,15 @@ struct UTF16Text {
         guard hi > lo else { return "" }
         return ns.substring(with: NSRange(location: lo, length: hi - lo))
     }
+
+    /// First literal occurrence of `needle` at or after UTF-16 offset `from`.
+    func find(_ needle: String, from: Int) -> (start: Int, end: Int)? {
+        let start = max(0, min(from, ns.length))
+        let r = ns.range(of: needle, options: [], range: NSRange(location: start, length: ns.length - start))
+        guard r.location != NSNotFound else { return nil }
+        return (r.location, r.location + r.length)
+    }
+    #endif
 
     func isWhitespace(at i: Int) -> Bool {
         guard let s = scalar(at: i) else { return false }
@@ -49,24 +94,5 @@ struct UTF16Text {
         default:
             return false
         }
-    }
-}
-
-/// Compile an ICU regex; traps on a bad literal pattern (all patterns here are
-/// compile-time constants, so failure indicates a source bug).
-func rx(_ pattern: String, _ options: NSRegularExpression.Options = []) -> NSRegularExpression {
-    do { return try NSRegularExpression(pattern: pattern, options: options) }
-    catch { fatalError("invalid regex: \(pattern) — \(error)") }
-}
-
-extension NSRegularExpression {
-    /// All matches over the whole string.
-    func matches(_ ns: NSString) -> [NSTextCheckingResult] {
-        matches(in: ns as String, range: NSRange(location: 0, length: ns.length))
-    }
-
-    /// Whether the pattern occurs anywhere in `slice`.
-    func matches(_ slice: String) -> Bool {
-        firstMatch(in: slice, range: NSRange(location: 0, length: (slice as NSString).length)) != nil
     }
 }

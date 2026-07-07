@@ -1,4 +1,6 @@
+#if !os(WASI)
 import Foundation
+#endif
 
 /// A category of personal information that ``Redact`` can detect.
 ///
