@@ -1,5 +1,7 @@
 .build/
 .swiftpm/
+# Compiled WebAssembly (built by `mise run build-web`)
+*.wasm
 .DS_Store
 *.xcuserstate
 xcuserdata/
@@ -7,3 +9,14 @@ DerivedData/
 Vendor/
 Examples/RedactWasmExample/node_modules/
 Examples/RedactWasmExample/package-lock.json
+packages/redact-node/dist/
+packages/redact-node/node_modules/
+packages/redact-node/LICENSE.md
+packages/redact-kotlin/src/main/jniLibs/
+packages/redact-kotlin/src/main/assets/
+packages/redact-kotlin/natives/
+packages/redact-kotlin/.gradle/
+packages/redact-kotlin/build/
+packages/redact-kotlin/src/main/resources/
+packages/redact-kotlin/redact-onnx-resources/src/main/resources/
+packages/redact-kotlin/redact-onnx-resources/build/

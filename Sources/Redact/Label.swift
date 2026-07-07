@@ -1,7 +1,3 @@
-#if !os(WASI)
-import Foundation
-#endif
-
 /// A category of personal information that ``Redact`` can detect.
 ///
 /// The raw value is the stable public label string (e.g. `"GIVEN_NAME"`) used in
@@ -27,6 +23,7 @@ public enum Label: String, Sendable, Hashable, CaseIterable {
     case driversLicense = "DRIVERS_LICENSE"
     case taxID = "TAX_ID"
     case ssn = "SSN"
+    case imei = "IMEI"
 
     /// A short, human-readable name for this category.
     public var displayName: String {
@@ -51,6 +48,7 @@ public enum Label: String, Sendable, Hashable, CaseIterable {
         case .driversLicense: "Driver's license"
         case .taxID: "Tax ID"
         case .ssn: "SSN"
+        case .imei: "IMEI"
         }
     }
 

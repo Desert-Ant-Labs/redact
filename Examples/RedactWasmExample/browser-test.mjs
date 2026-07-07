@@ -18,7 +18,8 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
     let p = url.pathname === "/" ? "/Examples/RedactWasmExample/browser.html" : url.pathname;
-    if (p.startsWith("/node_modules/")) p = "/Examples/RedactWasmExample" + p;
+    if (p.startsWith("/node_modules/@bjorn3/")) p = "/packages/redact-node" + p;
+    else if (p.startsWith("/node_modules/")) p = "/Examples/RedactWasmExample" + p;
     const file = path.join(root, decodeURIComponent(p));
     const body = await readFile(file);
     res.writeHead(200, { "content-type": mime[path.extname(file)] ?? "application/octet-stream" });

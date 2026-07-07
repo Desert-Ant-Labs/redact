@@ -1,22 +1,29 @@
-# Third-party notices — Redact (Swift)
+# Third-party notices - Redact (Swift)
 
 The bundled `redact` model and tokenizer derive from components under the
 licenses below, each permitting commercial use and derivative works.
 
 ## Model
-- **Multilingual-MiniLM-L12-H384** — Microsoft — **MIT**. Base encoder (truncated
+- **Multilingual-MiniLM-L12-H384** - Microsoft - **MIT**. Base encoder (truncated
   to 6 layers, EU-script vocab, fine-tuned for PII tagging).
-- **GLiNER-PII** — NVIDIA — **NVIDIA Open Model License** (commercial + derivatives
+- **GLiNER-PII** - NVIDIA - **NVIDIA Open Model License** (commercial + derivatives
   permitted; NVIDIA claims no ownership of outputs). Used to label training data.
   *Licensed by NVIDIA Corporation under the NVIDIA Open Model License.*
-- **DeepSeek-V3.2-Exp** — DeepSeek — **MIT**. Used to generate synthetic training text.
+- **DeepSeek-V3.2-Exp** - DeepSeek - **MIT**. Used to generate synthetic training text.
 
 ## Training data (not redistributed here)
-- `ai4privacy/pii-masking-openpii-1.5m` — **CC-BY-4.0**. Copyright © Ai Suisse SA.
+- `ai4privacy/pii-masking-openpii-1.5m` - **CC-BY-4.0**. Copyright © Ai Suisse SA.
   Attribution: **"Ai4Privacy / Ai Suisse SA"**.
-- `gretelai/gretel-pii-masking-en-v1`, `gretelai/synthetic_pii_finance_multilingual` — **Apache-2.0**.
-- `E3-JSI/synthetic-multi-pii-ner-v1` — **MIT**.
-- `allenai/c4`, `HuggingFaceFW/fineweb-2` — **ODC-BY** (raw text for distillation).
+- `gretelai/gretel-pii-masking-en-v1`, `gretelai/synthetic_pii_finance_multilingual` - **Apache-2.0**.
+- `E3-JSI/synthetic-multi-pii-ner-v1` - **MIT**.
+- `allenai/c4`, `HuggingFaceFW/fineweb-2` - **ODC-BY** (raw text for distillation).
 - Synthetic values generated with **Faker** (MIT).
 
 No non-commercial or unlicensed data is used.
+
+## Android platform libraries
+
+Android regex uses `java.util.regex.Pattern` and JSON parsing uses the Kotlin
+host's native JSON, both through the JNI host. Android NFKC normalization uses
+the platform `libicu.so` exposed by the NDK (API 31+), so no regex, JSON, or
+Unicode normalization library is vendored or hand-rolled.

@@ -1,6 +1,4 @@
-#if !os(WASI)
-import Foundation
-#endif
+import Regex
 
 /// High-precision deterministic recognizers (regex + checksums), a direct port
 /// of `redact_training.deterministic` (v1.4). These *own* structured labels where
@@ -72,7 +70,8 @@ enum Deterministic {
         for (i, v) in d.enumerated() { var x = v; if i % 2 == parity { x *= 2; if x > 9 { x -= 9 } }; total += x }
         return total % 10 == 0
     }
-    private static func joinInt(_ d: ArraySlice<Int>) -> Int { Int(d.map(String.init).joined()) ?? 0 }
+    // 64-bit even on 32-bit wasm: national IDs join up to 13 digits.
+    private static func joinInt64(_ d: ArraySlice<Int>) -> Int64 { Int64(d.map(String.init).joined()) ?? 0 }
     private static func stripSpaces(_ s: String) -> String { String(s.filter { $0 != " " }) }
 
     // MARK: checksums
@@ -135,9 +134,9 @@ enum Deterministic {
     private static func eeIsikukoodOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 11 else { return false }; var c = wsum(Array(d.prefix(10)), [1,2,3,4,5,6,7,8,9,1]) % 11; if c == 10 { c = wsum(Array(d.prefix(10)), [3,4,5,6,7,8,9,1,2,3]) % 11; if c == 10 { c = 0 } }; return c == d[10] }
     private static func grAmkaOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 11, (d[2]*10+d[3]) >= 1, (d[2]*10+d[3]) <= 12 else { return false }; return luhnLen(d) }
     private static func ptNifOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 9, [1,2,3,5,6,8,9].contains(d[0]) else { return false }; var c = 11 - wsum(Array(d.prefix(8)), [9,8,7,6,5,4,3,2]) % 11; if c >= 10 { c = 0 }; return c == d[8] }
-    private static func frNirOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 15, d[0] == 1 || d[0] == 2 else { return false }; let k = 97 - joinInt(d[0..<13]) % 97; return d[13]*10+d[14] == (k == 0 ? 97 : k) }
-    private static func beRrnOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 11 else { return false }; let base = joinInt(d[0..<9]), chk = d[9]*10+d[10]; return (97 - base % 97) % 97 == chk || (97 - (2_000_000_000 + base) % 97) % 97 == chk }
-    private static func czRcOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 10 else { return false }; let mm = d[2]*10+d[3]; guard [0,20,50,70].contains(where: { mm-$0 >= 1 && mm-$0 <= 12 }) else { return false }; return joinInt(d[0..<10]) % 11 == 0 }
+    private static func frNirOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 15, d[0] == 1 || d[0] == 2 else { return false }; let k = 97 - Int(joinInt64(d[0..<13]) % 97); return d[13]*10+d[14] == (k == 0 ? 97 : k) }
+    private static func beRrnOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 11 else { return false }; let base = joinInt64(d[0..<9]), chk = Int64(d[9]*10+d[10]); return (97 - base % 97) % 97 == chk || (97 - (2_000_000_000 + base) % 97) % 97 == chk }
+    private static func czRcOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 10 else { return false }; let mm = d[2]*10+d[3]; guard [0,20,50,70].contains(where: { mm-$0 >= 1 && mm-$0 <= 12 }) else { return false }; return joinInt64(d[0..<10]) % 11 == 0 }
     private static func siEmsoOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 13, (d[2]*10+d[3]) >= 1, (d[2]*10+d[3]) <= 12 else { return false }; let m = wsum(Array(d.prefix(12)), [7,6,5,4,3,2,7,6,5,4,3,2]) % 11; let chk = m == 0 ? 0 : 11 - m; return chk != 10 && chk == d[12] }
     private static func huAdoazOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 10, d[0] == 8 else { return false }; var c = 0; for i in 0..<9 { c += d[i] * (i + 1) }; c %= 11; return c != 10 && c == d[9] }
     private static func lvPkOk(_ v: String) -> Bool { let d = dl(v); guard d.count == 11, d[0] != 3, (d[2]*10+d[3]) >= 1, (d[2]*10+d[3]) <= 12 else { return false }; return ((1 - wsum(Array(d.prefix(10)), [1,6,3,7,9,10,5,8,4,2])) % 11 + 11) % 11 % 10 == d[10] }
@@ -168,7 +167,7 @@ enum Deterministic {
     // VAT: per-country checksum
     private static let vatFmtOnly: Set<String> = ["ES", "LV", "NL"]
     private static let vat: [String: (String) -> Bool] = {
-        func re(_ p: String) -> Rgx { rx("^" + p + "$") }
+        func re(_ p: String) -> Pattern { rx("^" + p + "$") }
         var m: [String: (String) -> Bool] = [
             "AT": { n in guard re(#"U\d{8}"#).test(n) else { return false }; let d = dl(n); var s = 4; for i in 0..<7 { var x = d[i] * (i % 2 == 1 ? 2 : 1); if x > 9 { x -= 9 }; s += x }; return (10 - s % 10) % 10 == d[7] },
             "BE": { n in re(#"0\d{9}"#).test(n) && (97 - Int(n.prefix(8))! % 97) == Int(n.suffix(2))! },
@@ -202,10 +201,10 @@ enum Deterministic {
     }()
 
     // MARK: helpers
-    private static func hasContext(_ re: Rgx, _ t: UTF16Text, _ start: Int, _ end: Int, _ window: Int = 48) -> Bool {
+    private static func hasContext(_ re: Pattern, _ t: UTF16Text, _ start: Int, _ end: Int, _ window: Int = 48) -> Bool {
         re.test(t.slice(max(0, start - window), min(t.length, end + window)))
     }
-    private static func before(_ re: Rgx, _ t: UTF16Text, _ start: Int, _ window: Int = 64) -> Bool {
+    private static func before(_ re: Pattern, _ t: UTF16Text, _ start: Int, _ window: Int = 64) -> Bool {
         re.test(t.slice(max(0, start - window), start))
     }
     private static let ipv4ShapeRE = rx(#"^(\d{1,3}\.){3}\d{1,3}$"#)
@@ -231,7 +230,7 @@ enum Deterministic {
     }
     /// Keyword+value recognizer (mirrors deterministic.ts): case-sensitive
     /// `valueRE` applied to the text after each keyword match.
-    private static func keywordValue(_ t: UTF16Text, _ m: RgxMatch, _ valueRE: Rgx) -> (String, Int, Int)? {
+    private static func keywordValue(_ t: UTF16Text, _ m: PatternMatch, _ valueRE: Pattern) -> (String, Int, Int)? {
         let after = t.slice(m.end, t.length)
         guard let vm = valueRE.first(after), let g = vm.range(at: 1) else { return nil }
         let vs = m.end + g.start

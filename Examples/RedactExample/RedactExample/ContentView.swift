@@ -3,7 +3,7 @@ import SwiftUI
 
 // A tiny on-device PII demo, mirroring the web demo: pick a sample or type your
 // own text, and Redact highlights or masks the personal data it finds. Nothing
-// leaves the device. Everything below is UI — the whole SDK surface used here is
+// leaves the device. Everything below is UI. The whole SDK surface used here is
 // `Redact()` and `redaction(of:)`.
 
 struct ContentView: View {
@@ -15,7 +15,7 @@ struct ContentView: View {
     // Same five preview texts as the web demo: chat, a support ticket, a
     // Latin/Cyrillic/Greek mix, a form, and structured IDs.
     private static let samples: [(name: String, text: String)] = [
-        ("Chat", "Hey, it's Anna Kovács — call me on +36 30 123 4567 or email anna.kovacs@example.hu. My IBAN is GB29 NWBK 6016 1331 9268 19 for the refund."),
+        ("Chat", "Hey, it's Anna Kovács, call me on +36 30 123 4567 or email anna.kovacs@example.hu. My IBAN is GB29 NWBK 6016 1331 9268 19 for the refund."),
         ("Ticket", "Customer: Dr. José-María O'Brien. Address: 123 Main Street, Apt 4B, München 80331. Card 4111 1111 1111 1111 was charged twice."),
         ("Multilingual", "Меня зовут Иван Петров, тел. +7 495 123-45-67. Παρακαλώ καλέστε τον Γιώργο Παπαδόπουλο. Mein Name ist Klaus Müller."),
         ("Form", "Full name: Sofia Rossi\nEmail: sofia.rossi@posteo.it\nPhone: 06 1234 5678\nSSN: 123-45-6789\nAddress: Via Roma 15, 00184 Roma"),
@@ -66,7 +66,7 @@ struct ContentView: View {
             Text("On-device PII redaction")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.tint)
-            Text("Names, addresses, emails, phones, cards, IBANs and IDs — masked on device, across all 24 EU languages. Your text never leaves the phone.")
+            Text("Names, addresses, emails, phones, cards, IBANs and IDs, masked on device, across all 24 EU languages. Your text never leaves the phone.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

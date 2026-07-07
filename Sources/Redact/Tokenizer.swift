@@ -1,6 +1,4 @@
-#if !os(WASI)
-import Foundation
-#endif
+import TextNormalization
 
 /// XLM-R SentencePiece **Unigram** tokenizer, ported to pure Swift and verified
 /// to reproduce the training tokenizer's ids exactly (NFKC normalization, no
@@ -25,56 +23,87 @@ struct Tokenizer {
 
     private static let metaspace: Unicode.Scalar = "\u{2581}"  // ▁
 
-    init?(bytes b: [UInt8]) {
-        guard b.count >= 21, b[0] == 0x52, b[1] == 0x44, b[2] == 0x54, b[3] == 0x4B else { return nil } // "RDTK"
-        var off = 5
-        func i32() -> Int {
-            let v = Int32(bitPattern:
-                UInt32(b[off]) | UInt32(b[off + 1]) << 8 | UInt32(b[off + 2]) << 16 | UInt32(b[off + 3]) << 24)
-            off += 4
-            return Int(v)
-        }
-        unkID = i32(); bosID = i32(); eosID = i32()
-        let count = i32()
-        guard count > 0 else { return nil }
+    init?(bytes: [UInt8]) {
+        guard bytes.count >= 21, bytes.starts(with: [0x52, 0x44, 0x54, 0x4B]) else { return nil }
+        var offset = 5
 
-        var sc = [Float](); sc.reserveCapacity(count)
+        func readU16() -> Int? {
+            guard offset <= bytes.count - 2 else { return nil }
+            defer { offset += 2 }
+            return Int(bytes[offset]) | Int(bytes[offset + 1]) << 8
+        }
+        func readU32() -> UInt32? {
+            guard offset <= bytes.count - 4 else { return nil }
+            defer { offset += 4 }
+            return UInt32(bytes[offset])
+                | UInt32(bytes[offset + 1]) << 8
+                | UInt32(bytes[offset + 2]) << 16
+                | UInt32(bytes[offset + 3]) << 24
+        }
+        func readInt() -> Int? { readU32().map { Int(Int32(bitPattern: $0)) } }
+
+        guard let unk = readInt(), let bos = readInt(), let eos = readInt(),
+              let count = readInt(), count > 0,
+              count <= (bytes.count - offset) / 6 else { return nil }
+
+        var parsedScores: [Float] = []
+        parsedScores.reserveCapacity(count)
         for _ in 0..<count {
-            sc.append(Float(bitPattern:
-                UInt32(b[off]) | UInt32(b[off + 1]) << 8 | UInt32(b[off + 2]) << 16 | UInt32(b[off + 3]) << 24))
-            off += 4
+            guard let bits = readU32() else { return nil }
+            parsedScores.append(Float(bitPattern: bits))
         }
-        var lens = [Int](); lens.reserveCapacity(count)
+
+        var lengths: [Int] = []
+        lengths.reserveCapacity(count)
         for _ in 0..<count {
-            lens.append(Int(b[off]) | Int(b[off + 1]) << 8)
-            off += 2
+            guard let length = readU16() else { return nil }
+            lengths.append(length)
         }
-        var idx = [String: Int](minimumCapacity: count)
-        var maxScalars = 1
-        for i in 0..<count {
-            let piece = String(decoding: b[off..<(off + lens[i])], as: UTF8.self)
-            off += lens[i]
-            idx[piece] = i
-            let ns = piece.unicodeScalars.count
-            if ns > maxScalars { maxScalars = ns }
+
+        var parsedIndex = [String: Int](minimumCapacity: count)
+        var maximumLength = 1
+        for (id, length) in lengths.enumerated() {
+            guard length <= bytes.count - offset else { return nil }
+            let piece = String(decoding: bytes[offset..<(offset + length)], as: UTF8.self)
+            offset += length
+            parsedIndex[piece] = id
+            maximumLength = max(maximumLength, piece.unicodeScalars.count)
         }
-        scores = sc
-        index = idx
-        maxLen = min(maxScalars, 32)
-        unkPenalty = Double(sc.min() ?? 0) - 10.0
+        guard offset == bytes.count, parsedIndex.count == count,
+              (0..<count).contains(unk), (0..<count).contains(bos), (0..<count).contains(eos) else { return nil }
+
+        unkID = unk
+        bosID = bos
+        eosID = eos
+        scores = parsedScores
+        index = parsedIndex
+        maxLen = min(maximumLength, 32)
+        unkPenalty = Double(parsedScores.min() ?? 0) - 10.0
     }
 
     /// Tokenize `text` into content sub-words (no `<s>` / `</s>`), Viterbi-optimal
     /// over the unigram vocabulary.
     func tokenize(_ text: String) -> [Token] {
-        #if os(WASI)
-        // No ICU in the wasm build: NFKC via the host JS engine (JSEngine).
-        let nfkc = JSEngine.nfkc(text)
-        #else
-        let nfkc = text.precomposedStringWithCompatibilityMapping
-        #endif
+        let nfkc = text.nfkc
+        // SentencePiece's `remove_extra_whitespaces`: trim and collapse space
+        // runs, like the training tokenizer. Offsets are unaffected (they are
+        // recovered by scanning the non-space token surfaces in the source
+        // text), but masked-out regions tokenize to far fewer pieces.
+        var squeezed = [Unicode.Scalar]()
+        squeezed.reserveCapacity(nfkc.unicodeScalars.count)
+        var lastWasSpace = true  // trims leading spaces
+        for scalar in nfkc.unicodeScalars {
+            if scalar == " " {
+                if lastWasSpace { continue }
+                lastWasSpace = true
+            } else {
+                lastWasSpace = false
+            }
+            squeezed.append(scalar)
+        }
+        if squeezed.last == " " { squeezed.removeLast() }
         let normalized = "\u{2581}" + String(String.UnicodeScalarView(
-            nfkc.unicodeScalars.map { $0 == " " ? "\u{2581}" : $0 }))
+            squeezed.map { $0 == " " ? "\u{2581}" : $0 }))
         let s = Array(normalized.unicodeScalars)
         let n = s.count
         if n == 0 { return [] }

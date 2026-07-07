@@ -1,43 +1,32 @@
 <!doctype html>
-<!-- Browser harness: Swift wasm pipeline + onnxruntime-web inference. -->
+<!-- Browser example for packages/redact-node: Swift wasm core + onnxruntime-web. -->
 <html>
 <body>
 <script type="importmap">
-  { "imports": { "@bjorn3/browser_wasi_shim": "/node_modules/@bjorn3/browser_wasi_shim/dist/index.js" } }
+  {
+    "imports": {
+      "@bjorn3/browser_wasi_shim": "/node_modules/@bjorn3/browser_wasi_shim/dist/index.js",
+      "onnxruntime-web": "/node_modules/onnxruntime-web/dist/ort.min.mjs"
+    }
+  }
 </script>
 <script type="module">
-  import * as ort from "/node_modules/onnxruntime-web/dist/ort.min.mjs";
+  import * as ort from "onnxruntime-web";
   ort.env.wasm.wasmPaths = "/node_modules/onnxruntime-web/dist/";
 
   async function run() {
-    const [tokenizer, labels] = await Promise.all([
-      fetch("/Sources/RedactResources/Resources/redact_tokenizer.bin").then(r => r.arrayBuffer()),
-      fetch("/Sources/RedactResources/Resources/labels.json").then(r => r.text()),
-    ]);
-    globalThis.__redactResources = { tokenizer: new Uint8Array(tokenizer), labels };
-
-    const session = await ort.InferenceSession.create("/Sources/RedactResources/Resources/redact.onnx");
-    globalThis.__redactRunModel = async (idsInt32Array) => {
-      const n = idsInt32Array.length;
-      const ids = BigInt64Array.from(idsInt32Array, v => BigInt(v));
-      const mask = new BigInt64Array(n).fill(1n);
-      const out = await session.run({
-        input_ids: new ort.Tensor("int64", ids, [1, n]),
-        attention_mask: new ort.Tensor("int64", mask, [1, n]),
-      });
-      return { logits: Float32Array.from(out.logits.data), numLabels: Number(out.logits.dims[2]) };
-    };
-
-    const { init } = await import("/.build/wasm-release/index.js");
-    await init({});
+    const { Redact } = await import("/packages/redact-node/index.js");
+    // The Swift core downloads + verifies + caches the model from the Hub;
+    // onnxruntime-web runs inference.
+    const redact = await Redact.load({ ort });
 
     const text = "Hi, I'm Anna Kowalska. Email me at anna.k@example.com or call +1 (555) 010-4477. " +
       "I live at 123 Any Street, Apt 4B, Seattle, WA 98109. Card: 4539 1488 0343 6467.";
     const start = performance.now();
-    const result = await globalThis.__redactSwift(text, 0.6);
+    const r = await redact.redaction(text);
     return {
-      redactedText: result.redactedText,
-      items: Array.from(result.items).map(i => ({ ...i })),
+      redactedText: r.redactedText,
+      items: r.items,
       ms: Math.round(performance.now() - start),
     };
   }

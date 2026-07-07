@@ -1,6 +1,4 @@
-#if !os(WASI)
-import Foundation
-#endif
+import Regex
 
 /// Portable span post-processing - a direct port of `redact_training.pipeline`
 /// (and the demo's `pipeline.mjs`): BIOES decoding, word snapping, name

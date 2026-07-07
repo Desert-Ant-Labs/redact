@@ -1,66 +1,51 @@
-#if os(WASI)
-import WASILibc
-#else
-import Foundation
-import RedactResources
-#endif
+import Inference
+import JSON
+import RealModule
 
-/// Loads the bundled token classifier + tokenizer and runs the full hybrid
-/// detection pipeline: windowing, BIOES decoding, and the deterministic-owner
-/// merge. Inference itself is delegated to the platform `InferenceEngine`
-/// (Core ML on Apple platforms, ONNX Runtime on Android/Linux).
+/// The full hybrid detector: tokenization, windowing, BIOES decoding, and the
+/// deterministic-owner merge. Inference goes through the shared
+/// `InferenceSession` (Core ML | ONNX Runtime | JS host, chosen by
+/// desert-ant-core); this file only knows redact's tensor layouts.
 final class Model: @unchecked Sendable {
-    private let engine: InferenceEngine
+    private let session: any InferenceSession
+    private let layout: ModelLayout
     private let tokenizer: Tokenizer
     private let id2label: [Int: String]
 
     private static let seq = 256
     private static let maxContent = seq - 2      // room for <s> … </s>
     private static let lowScore = 0.3
-    private static let metaspace: Character = "\u{2581}"
+    // position_ids baked into the Core ML export: arange(pad+1, pad+1+seq).
+    private static let positionIDs: [Int32] = (0..<seq).map { Int32(2 + $0) }
+    private static let typeIDs = [Int32](repeating: 0, count: seq)
 
-    init() throws {
-        #if os(WASI)
-        // No filesystem in the browser: the JS host injects the tokenizer and
-        // label map (and runs the ONNX model) via globals. See JSEngine.
-        guard
-            let tokBytes = JSEngine.tokenizerBytes(),
-            let tok = Tokenizer(bytes: tokBytes),
-            let labels = JSEngine.labelMap()
-        else { throw RedactError.resourceMissing }
+    init(assets: ModelAssets) throws {
+        guard let tok = Tokenizer(bytes: assets.tokenizer) else { throw RedactError.resourceMissing }
         tokenizer = tok
-        id2label = labels
-        engine = try JSEngine()
-        #else
-        let bundle = RedactResourcesBundle.bundle
-        guard
-            let tokURL = bundle.url(forResource: "redact_tokenizer", withExtension: "bin"),
-            let labURL = bundle.url(forResource: "labels", withExtension: "json"),
-            let tok = Tokenizer(bytes: [UInt8](try Data(contentsOf: tokURL)))
-        else { throw RedactError.resourceMissing }
-        tokenizer = tok
-        let labelData = try Data(contentsOf: labURL)
+        id2label = try Model.parseLabels(assets.labelsJSON)
+        session = assets.session
+        layout = assets.layout
+    }
 
-        struct Labels: Decodable { let id2label: [String: String] }
-        let labels = try JSONDecoder().decode(Labels.self, from: labelData)
-        id2label = Dictionary(uniqueKeysWithValues: labels.id2label.compactMap { k, v in Int(k).map { ($0, v) } })
-
-        #if canImport(CoreML)
-        engine = try CoreMLEngine()
-        #else
-        guard let onnxURL = bundle.url(forResource: "redact", withExtension: "onnx") else {
-            throw RedactError.resourceMissing
+    /// `labels.json` is `{"id2label": {"0": "O", ...}}`; decode it with the
+    /// platform's native JSON (NativeJSON, Codable) into `id -> label`.
+    private struct Labels: Decodable { let id2label: [String: String] }
+    private static func parseLabels(_ json: String) throws -> [Int: String] {
+        let labels = try JSONDecoder().decode(Labels.self, from: json)
+        var out: [Int: String] = [:]
+        for (key, label) in labels.id2label {
+            if let id = Int(key) { out[id] = label }
         }
-        engine = try OrtEngine(modelPath: onnxURL.path)
-        #endif
-        #endif
+        guard !out.isEmpty else { throw RedactError.resourceMissing }
+        return out
     }
 
     // MARK: public entry - full hybrid detection
     func detect(_ text: String, minScore: Double) async throws -> [Span] {
+        let threshold = minScore.isFinite ? min(1, max(0, minScore)) : 0.6
         let det = Deterministic.detect(text, enabled: Deterministic.owned)
         let masked = Pipeline.maskText(text, det)
-        let ml = try await mlSpans(masked, minScore: minScore)
+        let ml = try await mlSpans(masked, minScore: threshold)
         let corr = Deterministic.detect(text, enabled: ["PHONE"]).filter { !Deterministic.owned.contains($0.label) }
         return Pipeline.cleanSpans(text, Pipeline.relabelByContext(text, Pipeline.resolve(det + corr, ml)))
     }
@@ -74,9 +59,8 @@ final class Model: @unchecked Sendable {
 
         var scored: [(Span, Double)] = []
         var i = 0
-        while i < max(tokens.count, 1) {
+        while i < tokens.count {
             let chunk = Array(tokens[i..<min(i + Model.maxContent, tokens.count)])
-            if chunk.isEmpty { break }
             let chunkOffsets = Array(offsets[i..<i + chunk.count])
             let (tags, tagOffsets, probs) = try await runWindow(chunk, chunkOffsets)
             // score = max token prob overlapping each BIOES span (within this window)
@@ -105,8 +89,10 @@ final class Model: @unchecked Sendable {
         let realLen = ids.count
         var offs: [(Int, Int)] = [(0, 0)] + chunkOffsets + [(0, 0)]
 
-        let (logits, numLabels) = try await engine.logits(ids: ids)
-        guard logits.count >= realLen * numLabels else { throw RedactError.predictionFailed }
+        let (logits, numLabels) = try await logits(ids: ids)
+        guard numLabels > 0, logits.count == realLen * numLabels else {
+            throw RedactError.predictionFailed
+        }
 
         var tags = [String](repeating: "O", count: realLen)
         var probs = [Double](repeating: 0, count: realLen)
@@ -117,9 +103,9 @@ final class Model: @unchecked Sendable {
                 if v > mx { mx = v; top = c }
             }
             var sum = 0.0
-            for c in 0..<numLabels { sum += exp(Double(logits[k * numLabels + c]) - mx) }
+            for c in 0..<numLabels { sum += Double.exp(Double(logits[k * numLabels + c]) - mx) }
             tags[k] = id2label[top] ?? "O"
-            probs[k] = exp(Double(logits[k * numLabels + top]) - mx) / sum
+            probs[k] = Double.exp(Double(logits[k * numLabels + top]) - mx) / sum
         }
         if offs.count > realLen { offs = Array(offs.prefix(realLen)) }
         return (tags, offs, probs)
@@ -144,5 +130,59 @@ final class Model: @unchecked Sendable {
             }
         }
         return out
+    }
+
+    // MARK: inference (redact's tensor layouts over the shared session)
+
+    /// Run the token classifier over one window (<= 256 ids incl. specials).
+    /// Returns row-major logits, `ids.count * numLabels` values.
+    private func logits(ids: [Int]) async throws -> (values: [Float], numLabels: Int) {
+        switch layout {
+        case .paddedWindow: return try await paddedWindowLogits(ids: ids)
+        case .dynamicSequence: return try await dynamicSequenceLogits(ids: ids)
+        }
+    }
+
+    /// The Core ML export: fixed 256 window, int32 inputs, baked position ids.
+    private func paddedWindowLogits(ids: [Int]) async throws -> (values: [Float], numLabels: Int) {
+        let realLen = ids.count
+        guard realLen > 0, realLen <= Self.seq else { throw RedactError.predictionFailed }
+        var padded = [Int32](repeating: 1, count: Self.seq)   // <pad>
+        var mask = [Int32](repeating: 0, count: Self.seq)
+        for k in 0..<realLen {
+            padded[k] = Int32(ids[k])
+            mask[k] = 1
+        }
+        let logits = try await session.run(
+            inputs: [
+                "input_ids": Tensor(int32: padded, shape: [1, Self.seq]),
+                "attention_mask": Tensor(int32: mask, shape: [1, Self.seq]),
+                "position_ids": Tensor(int32: Self.positionIDs, shape: [1, Self.seq]),
+                "token_type_ids": Tensor(int32: Self.typeIDs, shape: [1, Self.seq]),
+            ],
+            outputs: ["logits"])[0]
+        guard logits.shape.count == 3, let all = logits.float32Values else {
+            throw RedactError.predictionFailed
+        }
+        let numLabels = logits.shape[2]
+        guard numLabels > 0, all.count >= realLen * numLabels else { throw RedactError.predictionFailed }
+        // The window is padded to 256 rows; only the first realLen are real.
+        return (Array(all[0..<(realLen * numLabels)]), numLabels)
+    }
+
+    /// The ONNX export: dynamic sequence length, int64 ids + mask.
+    private func dynamicSequenceLogits(ids: [Int]) async throws -> (values: [Float], numLabels: Int) {
+        let n = ids.count
+        guard n > 0 else { throw RedactError.predictionFailed }
+        let logits = try await session.run(
+            inputs: [
+                "input_ids": Tensor(int64: ids.map(Int64.init), shape: [1, n]),
+                "attention_mask": Tensor(int64: [Int64](repeating: 1, count: n), shape: [1, n]),
+            ],
+            outputs: ["logits"])[0]
+        guard let values = logits.float32Values, !values.isEmpty, values.count % n == 0 else {
+            throw RedactError.predictionFailed
+        }
+        return (values, values.count / n)
     }
 }

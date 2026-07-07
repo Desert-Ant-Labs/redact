@@ -1,19 +1,17 @@
 {
-  "name": "redactwasmexample",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "redact-wasm-example",
+  "private": true,
+  "type": "module",
+  "description": "node + headless-browser examples for packages/redact-node (run mise run wasm first)",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "node-example": "node main.mjs",
+    "browser-example": "node browser-test.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.3.0",
-    "onnxruntime-node": "^1.20.0",
-    "onnxruntime-web": "^1.20.0",
-    "playwright": "^1.61.1"
+    "onnxruntime-node": "^1.24.3",
+    "onnxruntime-web": "^1.24.3"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
   }
 }

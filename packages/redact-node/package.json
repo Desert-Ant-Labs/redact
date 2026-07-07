@@ -1,0 +1,61 @@
+{
+  "name": "@desert-ant-labs/redact",
+  "version": "0.3.0",
+  "description": "On-device multilingual PII redaction (shared Swift core compiled to WebAssembly; inference via ONNX Runtime).",
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://github.com/Desert-Ant-Labs/redact",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Desert-Ant-Labs/redact.git",
+    "directory": "packages/redact-node"
+  },
+  "keywords": [
+    "pii",
+    "redaction",
+    "privacy",
+    "on-device",
+    "ner",
+    "gdpr",
+    "wasm"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "scripts": {
+    "test": "node --test test/redact.test.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./wasm": "./dist/RedactWeb.wasm"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "dist",
+    "LICENSE.md"
+  ],
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "^0.3.0"
+  },
+  "peerDependencies": {
+    "onnxruntime-node": ">=1.20.0",
+    "onnxruntime-web": ">=1.20.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-node": {
+      "optional": true
+    },
+    "onnxruntime-web": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "onnxruntime-node": "^1.27.0"
+  }
+}
