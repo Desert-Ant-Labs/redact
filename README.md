@@ -25,7 +25,7 @@ r.items.first?.original   // "Anna"
 Add this package to your app with Swift Package Manager.
 
 ```swift
-.package(url: "https://github.com/Desert-Ant-Labs/redact-swift.git", from: "0.2.1")
+.package(url: "https://github.com/Desert-Ant-Labs/redact-swift.git", from: "0.1.0")
 ```
 
 Then add the `Redact` product to your app target.
