@@ -1,4 +1,8 @@
-Redact is a small on-device Swift package that finds and masks personally identifiable information (PII) in text: names, addresses, emails, phone numbers, cards, IBANs, national IDs, and more, across all 24 official EU languages. Everything runs on device and your text never leaves the phone.
+# Redact: On-device PII Redaction for Swift (iOS, macOS)
+
+Redact is a small on-device Swift package that finds and masks personally identifiable information (PII) in text: names, addresses, emails, phone numbers, cards, IBANs, national IDs, and more, across all 24 official EU languages. Everything runs on device and your text never leaves the phone. Scrub PII from customer support records, LLM prompts, and application logs so the raw data never reaches a server, yours or a third party's.
+
+Redaction is reversible: mask PII before sending text to an LLM, then restore the originals in the response. Keep the placeholder mapping and the result is pseudonymized; drop it and the masked copy is anonymized.
 
 ```swift
 import Redact
@@ -128,6 +132,14 @@ iOS 16+ / macOS 13+ / tvOS 16+ / visionOS 1+, Swift 5.9+.
 ## Model
 
 The bundled model is published at [`desert-ant-labs/redact`](https://huggingface.co/desert-ant-labs/redact) on Hugging Face: full weights, the compiled Core ML build, and the model card.
+
+## Other platforms
+
+Same model, native on each platform:
+
+- [`redact-kotlin`](https://github.com/Desert-Ant-Labs/redact-kotlin): Kotlin for Android and the JVM.
+- [`redact-js`](https://github.com/Desert-Ant-Labs/redact-js): JavaScript and TypeScript for Node and the browser.
+- Model weights and card: [`desert-ant-labs/redact`](https://huggingface.co/desert-ant-labs/redact) on Hugging Face.
 
 ## License
 
