@@ -15,8 +15,8 @@
 #   mise run publish-web     # @desert-ant-labs/redact -> npm
 #
 # `mise run android-natives` (internal) cross-compiles the Swift core into
-# jniLibs; it is what the Gradle AAR build invokes before packaging. See
-# PACKAGING.md for the one-time SDK/credentials setup.
+# jniLibs; it is what the Gradle AAR build invokes before packaging. See the
+# README for the task list and `mise.local.toml` secret setup.
 #
 # The release version is single-sourced from packages/redact-node/package.json;
 # the Gradle module versions must match it (publish tasks verify).
@@ -39,8 +39,8 @@
 #                      onnxruntime-node to also run the model-backed tests;
 #                      without it they skip).
 #   - test-android:    ANDROID_HOME and a connected device or running emulator.
-#   - publish-android: Maven Central portal credentials + signing key in the env
-#                      (see PACKAGING.md).
+#   - publish-android: Maven Central portal credentials + signing key in
+#                      mise.local.toml.
 #   - publish-web:     an npm token with publish rights on @desert-ant-labs.
 
 # Pinned Swift toolchain: the latest release with published wasm + android SDKs.
@@ -224,12 +224,12 @@ tools = { java = "temurin-21" }
 shell = "bash -c"
 run = """
 set -euo pipefail
-# Credentials come from mise.local.toml (see PACKAGING.md): a Central portal
-# token and an in-memory signing key, passed as Gradle properties via the env:
+# Credentials come from mise.local.toml: a Central portal token and an in-memory
+# signing key, passed as Gradle properties via the env:
 #   ORG_GRADLE_PROJECT_mavenCentralUsername / ORG_GRADLE_PROJECT_mavenCentralPassword
 #   ORG_GRADLE_PROJECT_signingInMemoryKey / ORG_GRADLE_PROJECT_signingInMemoryKeyPassword
-: "${ORG_GRADLE_PROJECT_mavenCentralUsername:?set the Central portal token in mise.local.toml (see PACKAGING.md)}"
-: "${ORG_GRADLE_PROJECT_signingInMemoryKey:?set the in-memory GPG signing key in mise.local.toml (see PACKAGING.md)}"
+: "${ORG_GRADLE_PROJECT_mavenCentralUsername:?set the Central portal token in mise.local.toml}"
+: "${ORG_GRADLE_PROJECT_signingInMemoryKey:?set the in-memory GPG signing key in mise.local.toml}"
 ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
 """
 
@@ -241,7 +241,7 @@ tools = { node = "22" }
 shell = "bash -c"
 run = """
 set -euo pipefail
-# Auth: NPM_TOKEN from mise.local.toml (see PACKAGING.md), or `npm login`.
+# Auth: NPM_TOKEN from mise.local.toml, or `npm login`.
 # The token goes through a throwaway userconfig so normal npm commands and
 # checked-in files never carry auth.
 if [ -n "${NPM_TOKEN:-}" ]; then

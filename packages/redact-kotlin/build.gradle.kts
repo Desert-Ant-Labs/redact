@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // builds from source) cannot produce it. `mise run publish-android` publishes
 // ai.desertant:redact to Maven Central via the Central portal (the vanniktech
 // plugin handles upload, validation, and in-memory GPG signing; credentials
-// come from the environment, see PACKAGING.md).
+// come from the environment, usually via mise.local.toml.
 plugins {
     id("com.android.library") version "8.7.3"
     id("org.jetbrains.kotlin.android") version "2.1.21"
