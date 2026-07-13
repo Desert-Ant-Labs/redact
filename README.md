@@ -1,4 +1,8 @@
-Redact is a small on-device Swift package that finds and masks personally identifiable information (PII) in text: names, addresses, emails, phone numbers, cards, IBANs, national IDs, and more, across all 24 official EU languages. Everything runs on device and your text never leaves the phone.
+# Redact: On-device PII Redaction
+
+Redact is a small on-device Swift package that finds and masks personally identifiable information (PII) in text: names, addresses, emails, phone numbers, cards, IBANs, national IDs, and more, across all 24 official EU languages. Everything runs on device and your text never leaves the phone. Scrub PII from customer support records, LLM prompts, and application logs so the raw data never reaches a server, yours or a third party's.
+
+Redaction is reversible: mask PII before sending text to an LLM, then restore the originals in the response. Keep the placeholder mapping and the result is pseudonymized; drop it and the masked copy is anonymized.
 
 ```swift
 import Redact
@@ -18,7 +22,7 @@ r.items.first?.original   // "Anna"
 - Validates structured fields with a dependency-free layer: Luhn cards, ISO-13616 IBANs, checksummed national IDs for all 24 EU countries, all 27 EU VAT numbers, IMEI, and per-country driving licences
 - Reversible redaction with unique, numbered placeholders for safe LLM round-trips
 - Small 4-bit Core ML model (~13 MB), downloaded on demand and cached, or bundled in your app
-- Runs entirely on-device; your text never leaves the device
+- One Swift core for every platform: iOS/macOS (SwiftPM), Android (Maven Central), and web (npm)
 
 ## Installation
 
@@ -179,6 +183,18 @@ building the Kotlin and npm artifacts in `packages/`.
 ## Model
 
 The bundled model is published at [`desert-ant-labs/redact`](https://huggingface.co/desert-ant-labs/redact) on Hugging Face: full weights, the compiled Core ML build, and the model card.
+
+## Other platforms
+
+Same model, same Swift core, shipped from this repository (see
+[PACKAGING.md](PACKAGING.md)):
+
+- Android: `ai.desertant:redact` on Maven Central (Kotlin over the
+  cross-compiled Swift core; optional `ai.desertant:redact-onnx-resources` to
+  bundle the model).
+- Web: [`@desert-ant-labs/redact`](https://www.npmjs.com/package/@desert-ant-labs/redact)
+  on npm (node + browsers; the core compiled to WebAssembly).
+- Model weights and card: [`desert-ant-labs/redact`](https://huggingface.co/desert-ant-labs/redact) on Hugging Face.
 
 ## License
 
