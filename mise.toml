@@ -224,12 +224,12 @@ tools = { java = "temurin-21" }
 shell = "bash -c"
 run = """
 set -euo pipefail
-# Credentials (see PACKAGING.md): a Central portal token and an in-memory
-# signing key, passed as Gradle properties via the environment:
+# Credentials come from mise.local.toml (see PACKAGING.md): a Central portal
+# token and an in-memory signing key, passed as Gradle properties via the env:
 #   ORG_GRADLE_PROJECT_mavenCentralUsername / ORG_GRADLE_PROJECT_mavenCentralPassword
 #   ORG_GRADLE_PROJECT_signingInMemoryKey / ORG_GRADLE_PROJECT_signingInMemoryKeyPassword
-: "${ORG_GRADLE_PROJECT_mavenCentralUsername:?set the Central portal token (see PACKAGING.md)}"
-: "${ORG_GRADLE_PROJECT_signingInMemoryKey:?set the in-memory GPG signing key (see PACKAGING.md)}"
+: "${ORG_GRADLE_PROJECT_mavenCentralUsername:?set the Central portal token in mise.local.toml (see PACKAGING.md)}"
+: "${ORG_GRADLE_PROJECT_signingInMemoryKey:?set the in-memory GPG signing key in mise.local.toml (see PACKAGING.md)}"
 ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
 """
 
@@ -241,8 +241,17 @@ tools = { node = "22" }
 shell = "bash -c"
 run = """
 set -euo pipefail
-# Auth: `npm login` once, or NPM_TOKEN in the environment / ~/.npmrc.
-npm publish --access public
+# Auth: NPM_TOKEN from mise.local.toml (see PACKAGING.md), or `npm login`.
+# The token goes through a throwaway userconfig so normal npm commands and
+# checked-in files never carry auth.
+if [ -n "${NPM_TOKEN:-}" ]; then
+    npmrc=$(mktemp)
+    trap 'rm -f "$npmrc"' EXIT
+    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$npmrc"
+    npm publish --access public --userconfig "$npmrc"
+else
+    npm publish --access public
+fi
 """
 
 # ---------------------------------------------------------------- internal

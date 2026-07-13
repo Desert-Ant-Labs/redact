@@ -171,25 +171,50 @@ One-time setup:
 2. A GPG key for signing: `gpg --gen-key`, then publish it:
    `gpg --keyserver keyserver.ubuntu.com --send-keys <KEY_ID>`.
 
-Per environment (shell or CI secrets):
-
-```bash
-export ORG_GRADLE_PROJECT_mavenCentralUsername=<portal token username>
-export ORG_GRADLE_PROJECT_mavenCentralPassword=<portal token password>
-export ORG_GRADLE_PROJECT_signingInMemoryKey="$(gpg --export-secret-keys --armor <KEY_ID> | grep -v '^-' | tr -d '\n')"
-export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=<key passphrase>
-```
-
 Signing only engages when the key is present, so local
 `./gradlew publishToMavenLocal` needs no setup. The task builds the natives
 first (via the Gradle hook) and requires `ANDROID_HOME`.
 
+### Secrets: `mise.local.toml`
+
+All release credentials live in a gitignored **`mise.local.toml`** at the repo
+root (mise loads it automatically for every task, so no manual exports). The
+durable copies live in 1Password; this file is machine-local plumbing,
+`chmod 600`. Shape:
+
+```toml
+[env]
+ANDROID_HOME = "/path/to/android-sdk"
+
+# Maven Central portal token (central.sonatype.com -> Generate User Token).
+ORG_GRADLE_PROJECT_mavenCentralUsername = { value = "...", redact = true }
+ORG_GRADLE_PROJECT_mavenCentralPassword = { value = "...", redact = true }
+
+# Artifact signing (armored private key + its passphrase).
+ORG_GRADLE_PROJECT_signingInMemoryKeyPassword = { value = "...", redact = true }
+ORG_GRADLE_PROJECT_signingInMemoryKey = { value = '''
+-----BEGIN PGP PRIVATE KEY BLOCK-----
+...
+-----END PGP PRIVATE KEY BLOCK-----
+''', redact = true }
+
+# npm automation token for @desert-ant-labs (publish-web).
+NPM_TOKEN = { value = "npm_...", redact = true }
+```
+
+`redact = true` masks the values in mise task output. For encrypted-at-rest
+secrets, mise also supports SOPS/age-encrypted env files
+(https://mise.jdx.dev/environments/secrets/); not used here since the file is
+local-only and 1Password is the source of truth.
+
 ### Web (`mise run publish-web`)
 
 Builds `dist/` fresh and runs `npm publish --access public` for
-`@desert-ant-labs/redact`. Auth: `npm login` once (or `NPM_TOKEN` via
-`~/.npmrc`) with publish rights on the `desert-ant-labs` npm org. The tarball
-carries index.js/index.d.ts, `dist/` (wasm + JS glue), README, and LICENSE.
+`@desert-ant-labs/redact`. Auth: `NPM_TOKEN` in `mise.local.toml` (an
+automation token with publish rights on the `desert-ant-labs` npm org; passed
+via a throwaway `--userconfig`, so no checked-in or global npmrc carries
+auth), or an interactive `npm login`. The tarball carries
+index.js/index.d.ts, `dist/` (wasm + JS glue), README, and LICENSE.
 
 ## Dev loop on Linux (this repo)
 

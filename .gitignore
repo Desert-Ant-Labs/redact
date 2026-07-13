@@ -20,3 +20,5 @@ packages/redact-kotlin/build/
 packages/redact-kotlin/src/main/resources/
 packages/redact-kotlin/redact-onnx-resources/src/main/resources/
 packages/redact-kotlin/redact-onnx-resources/build/
+mise.local.toml
+mise.*.local.toml
