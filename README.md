@@ -110,7 +110,7 @@ let redact = Redact(bundle: RedactCoreMLResourcesBundle.bundle)
 
 ### Example
 
-A SwiftUI example app is included in `Examples/RedactExample`. Open `Examples/RedactExample/RedactExample.xcodeproj` in Xcode and run.
+[SwiftUI example app](Examples/RedactExample)
 
 ## Android
 
@@ -202,12 +202,7 @@ val offline = Redact.bundled()                       // needs redact-onnx-resour
 
 ### Example
 
-An Android example app is included in `Examples/RedactAndroidExample`. It uses the Maven Central package `ai.desertant:redact` and downloads the model on first use. Run it with:
-
-```bash
-cd Examples/RedactAndroidExample
-./gradlew :app:installDebug
-```
+[Android example app](Examples/RedactAndroidExample)
 
 ## JavaScript and TypeScript
 
@@ -276,7 +271,7 @@ const redact = await Redact.load({ ort });
 
 ### Example
 
-JavaScript examples are in `Examples/RedactWasmExample`. The npm-specific quick start that is published to npm is in `packages/redact-node/README.md`.
+[JavaScript examples](Examples/RedactWasmExample)
 
 ## Reversible redaction for LLMs
 
