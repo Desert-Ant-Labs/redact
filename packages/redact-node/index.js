@@ -1,7 +1,6 @@
-// On-device multilingual PII redaction for JavaScript. All detection logic
-// lives in the shared Swift core (dist/RedactWeb.wasm); this file resolves
-// model assets, owns the ONNX Runtime session, and exposes the public typed API
-// (a `Redact` class with an async `load` factory, mirroring the iOS SDK).
+// On-device multilingual PII redaction for JavaScript. This file resolves model
+// assets, owns the ONNX Runtime session, and exposes the public typed API (a
+// `Redact` class with an async `load` factory).
 //
 // Works in node (onnxruntime-node or -web) and browsers (onnxruntime-web).
 
@@ -53,18 +52,17 @@ async function loadOrt(options) {
 export class Redact {
   /**
    * Load the model and return a ready redactor. Download, SHA-256 verification,
-   * and caching happen in the shared Swift core (dist/RedactWeb.wasm) via the
-   * same ModelStore used on iOS and Android; this host only owns the ONNX
-   * session behind the generic tensor contract (createSession + run). The repo
-   * and revision are pinned to the SDK.
+   * and caching are handled by the runtime; this host owns the ONNX session
+   * behind the generic tensor contract (createSession + run). The repo and
+   * revision are pinned to the SDK.
    */
   static async load(options = {}) {
     const resolved = options;
     const ort = await loadOrt(resolved);
     let session;
 
-    // Generic tensor I/O with the Swift core (JSInferenceSession): both sides
-    // exchange { name: { data: Uint8Array, dims: number[], type: "int64"|... } }.
+    // Generic tensor I/O with the WebAssembly runtime (JSInferenceSession): both
+    // sides exchange { name: { data: Uint8Array, dims: number[], type: "int64"|... } }.
     const typedArray = (t) => {
       const bytes = t.data.slice();  // own, aligned buffer
       switch (t.type) {

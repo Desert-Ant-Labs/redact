@@ -68,7 +68,7 @@ object HostBridge {
     /**
      * Parse [jsonUtf8] with the platform parser (kotlinx.serialization) and emit
      * the compact binary value tree desert-ant-core's JSON module decodes, so
-     * the Swift core hand-rolls no JSON on Android. Format: big-endian u32
+     * the native runtime hand-rolls no JSON on Android. Format: big-endian u32
      * payload length, then nodes tagged 0 null, 1 false, 2 true, 3 f64,
      * 4 string(u32+utf8), 5 array(u32 count+nodes),
      * 6 object(u32 count+[u32 keyLen+key, node]).

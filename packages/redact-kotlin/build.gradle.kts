@@ -1,8 +1,8 @@
 import com.vanniktech.maven.publish.AndroidSingleVariantLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// Android library (AAR) over the shared Swift core. Gradle drives the Swift
-// build: `apply(from = "swift-android.gradle.kts")` runs `mise run
+// Android library (AAR) with prebuilt native libraries. Gradle drives the
+// native build: `apply(from = "swift-android.gradle.kts")` runs `mise run
 // android-natives` (static-stdlib Swift JNI + ONNX Runtime) before packaging,
 // dropping the per-ABI libRedactAndroid.so into src/main/jniLibs. This AAR
 // ships no model: it downloads on demand by default. Bundling is opt-in via

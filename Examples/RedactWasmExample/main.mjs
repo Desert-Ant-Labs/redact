@@ -1,9 +1,9 @@
-// Node example for packages/redact-node: the shared Swift core compiled to
-// wasm, with inference on onnxruntime-node.
+// Node example for packages/redact-node with local WebAssembly and
+// onnxruntime-node inference.
 import { Redact } from "../../packages/redact-node/index.js";
 
-// The Swift core downloads, verifies (SHA-256), and caches the model from the
-// Hub; onnxruntime-node runs inference. First run fetches; later runs are cached.
+// Redact downloads, verifies (SHA-256), and caches the model from the Hub;
+// onnxruntime-node runs inference. First run fetches; later runs are cached.
 const redact = await Redact.load({});
 
 const text = process.argv.slice(2).join(" ") ||

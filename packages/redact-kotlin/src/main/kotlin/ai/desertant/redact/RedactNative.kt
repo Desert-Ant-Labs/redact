@@ -3,16 +3,15 @@ package ai.desertant.redact
 import ai.desertant.core.HostBridge
 
 /**
- * JNI surface over the shared Swift core (`libRedactAndroid.so`, built from
- * Sources/RedactAndroid/AndroidJNI.swift by `mise run android`). Android only:
- * `libRedactAndroid.so` statically links the Swift runtime. Instance-based: each
- * `Redact` is an opaque native handle (a `Long`). Text crosses as UTF-8 bytes;
- * the redaction result comes back as an FFIBuffer typed binary buffer.
+ * JNI surface over `libRedactAndroid.so`, built by `mise run android-natives`.
+ * Android only: `libRedactAndroid.so` statically links its runtime.
+ * Instance-based: each `Redact` is an opaque native handle (a `Long`). Text
+ * crosses as UTF-8 bytes; the redaction result comes back as an FFIBuffer typed
+ * binary buffer.
  *
  * `regexMatches` / `jsonParseTree` / `httpTree` / `httpDownload` are the host
- * callbacks the Swift `installHostBridge` looks up on this class (so the
- * pure-Swift core can use java.util.regex, the platform JSON parser, and
- * java.net without Foundation). They forward to `ai.desertant.core.HostBridge`.
+ * callbacks the native runtime looks up on this class. They forward to
+ * `ai.desertant.core.HostBridge`.
  */
 internal object RedactNative {
     @Volatile private var loaded = false

@@ -2,8 +2,8 @@
 
 On-device multilingual PII redaction for JavaScript (node and browsers). Finds
 names, addresses, emails, phone numbers, cards, IBANs, national IDs and more
-across the 24 official EU languages, fully locally: the detection pipeline is a
-shared Swift core compiled to WebAssembly, with inference via ONNX Runtime.
+across the 24 official EU languages, fully locally: the package runs through a
+local WebAssembly runtime with inference via ONNX Runtime.
 
 ```bash
 npm install @desert-ant-labs/redact onnxruntime-node   # or onnxruntime-web in browsers

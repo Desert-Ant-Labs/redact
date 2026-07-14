@@ -1,7 +1,7 @@
 {
   "name": "@desert-ant-labs/redact",
   "version": "0.3.0",
-  "description": "On-device multilingual PII redaction (shared Swift core compiled to WebAssembly; inference via ONNX Runtime).",
+  "description": "On-device multilingual PII redaction for JavaScript with local WebAssembly and ONNX Runtime inference.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://github.com/Desert-Ant-Labs/redact",

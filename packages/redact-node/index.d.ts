@@ -53,9 +53,9 @@ export interface LoadOptions {
 }
 
 /**
- * On-device multilingual PII redaction (shared Swift core compiled to
- * WebAssembly; inference via ONNX Runtime). Mirrors the iOS/Swift SDK: create
- * one with `await Redact.load(...)` and reuse it.
+ * On-device multilingual PII redaction for JavaScript with local WebAssembly
+ * and ONNX Runtime inference. Create one with `await Redact.load(...)` and
+ * reuse it.
  *
  * ```ts
  * const redact = await Redact.load();

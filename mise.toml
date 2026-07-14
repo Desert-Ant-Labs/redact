@@ -14,7 +14,7 @@
 #   mise run publish-android # ai.desertant:redact (+ redact-onnx-resources) -> Maven Central
 #   mise run publish-web     # @desert-ant-labs/redact -> npm
 #
-# `mise run android-natives` (internal) cross-compiles the Swift core into
+# `mise run android-natives` (internal) builds the Android native library into
 # jniLibs; it is what the Gradle AAR build invokes before packaging. See the
 # README for the task list and `mise.local.toml` secret setup.
 #
@@ -255,7 +255,6 @@ Redact $VERSION release.
 
 ## Highlights
 
-- One shared Swift redaction core for Apple platforms, Android, and WebAssembly.
 - On-demand model download and caching by default on all platforms.
 - Optional bundled model resources for fully offline Swift and Android apps.
 - Consistent public APIs across Swift, Kotlin, and JavaScript.

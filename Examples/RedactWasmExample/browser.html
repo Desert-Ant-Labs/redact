@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Browser example for packages/redact-node: Swift wasm core + onnxruntime-web. -->
+<!-- Browser example for packages/redact-node with local WebAssembly and onnxruntime-web. -->
 <html>
 <body>
 <script type="importmap">
@@ -16,7 +16,7 @@
 
   async function run() {
     const { Redact } = await import("/packages/redact-node/index.js");
-    // The Swift core downloads + verifies + caches the model from the Hub;
+    // Redact downloads, verifies, and caches the model from the Hub;
     // onnxruntime-web runs inference.
     const redact = await Redact.load({ ort });
 

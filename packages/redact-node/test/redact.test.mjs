@@ -1,6 +1,5 @@
-// The redact-node test suite (redaction-only, matching the iOS/Swift SDK). Runs
-// against the shared Swift core (dist/RedactWeb.wasm) with model files loaded
-// from the local ONNX resources instead of the Hugging Face Hub.
+// The redact-node test suite. Runs through the WebAssembly runtime with model
+// files loaded from the local ONNX resources instead of the Hugging Face Hub.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import path from "node:path";

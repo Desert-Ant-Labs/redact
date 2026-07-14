@@ -9,15 +9,27 @@ Email Anna Kovács at anna@example.hu.
 Email [GIVEN_NAME_1] [SURNAME_1] at [EMAIL_1].
 ```
 
-## Packages
+## Contents
 
-| Platform | Package | Runtime |
-| --- | --- | --- |
-| Swift, iOS, macOS, tvOS, visionOS | `https://github.com/Desert-Ant-Labs/redact.git` | Core ML on Apple platforms, ONNX Runtime on Linux |
-| Android | `ai.desertant:redact` | Cross-compiled Swift core plus ONNX Runtime |
-| JavaScript, Node and browsers | `@desert-ant-labs/redact` | Shared Swift core compiled to WebAssembly plus ONNX Runtime |
-
-All three packages use the same redaction pipeline, the same pinned model revision, and the same placeholder format.
+- [Features](#features)
+- [Swift](#swift)
+  - [Install](#install)
+  - [Usage](#usage)
+  - [Swift API](#swift-api)
+- [Android](#android)
+  - [Install](#install-1)
+  - [Usage](#usage-1)
+  - [Android API](#android-api)
+- [JavaScript and TypeScript](#javascript-and-typescript)
+  - [Install](#install-2)
+  - [Usage](#usage-2)
+  - [TypeScript API](#typescript-api)
+- [Reversible redaction for LLMs](#reversible-redaction-for-llms)
+- [Categories](#categories)
+- [Model and caching](#model-and-caching)
+- [Examples](#examples)
+- [Requirements](#requirements)
+- [License](#license)
 
 ## Features
 
@@ -356,32 +368,6 @@ Passing an explicit `directory` makes that directory the model home. Existing va
 A SwiftUI example app is included in `Examples/RedactExample`. Open `Examples/RedactExample/RedactExample.xcodeproj` in Xcode and run.
 
 The JavaScript package README in `packages/redact-node` contains the npm-specific quick start that is published to npm.
-
-## Development
-
-This repository builds all three distributions from one Swift core.
-
-```bash
-mise run build-swift
-mise run build-android
-mise run build-web
-
-mise run test-swift
-mise run test-android
-mise run test-web
-mise run test
-```
-
-Release tasks:
-
-```bash
-mise run set-version 0.3.1
-mise run publish-swift
-mise run publish-android
-mise run publish-web
-```
-
-`mise.local.toml` is gitignored and is the place for machine-local release credentials such as `ANDROID_HOME`, Maven Central portal credentials, signing keys, and `NPM_TOKEN`. Mark secrets with `redact = true` so mise masks them in task output.
 
 ## Requirements
 

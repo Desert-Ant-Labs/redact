@@ -12,9 +12,8 @@ import org.junit.runner.RunWith
 
 /**
  * Instrumented tests for the Android binding, exercising the real on-device path
- * (the shared Swift core via JNI: java.util.regex + platform JSON via
- * CHostBridge, system ICU for NFKC, static-stdlib runtime). The API mirrors iOS:
- * a `Redact` instance with `redaction`. The bundled model comes from the
+ * via JNI: java.util.regex, platform JSON via CHostBridge, system ICU for NFKC,
+ * and the static-stdlib runtime. The bundled model comes from the
  * `redact-onnx-resources` androidTest dependency.
  */
 @RunWith(AndroidJUnit4::class)

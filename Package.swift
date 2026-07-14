@@ -2,7 +2,7 @@
 import PackageDescription
 import Foundation
 
-// Redact: one Swift core, every platform.
+// Redact: on-device PII redaction for every platform.
 //
 //   desert-ant-core           reusable primitives (Regex, JSON, ModelStore,
 //                             Inference sessions + platform session factory)
