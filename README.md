@@ -9,8 +9,6 @@ Email Anna Kovács at anna@example.hu.
 Email [GIVEN_NAME_1] [SURNAME_1] at [EMAIL_1].
 ```
 
-## Contents
-
 - [Features](#features)
 - [Swift](#swift)
   - [Install](#install)
