@@ -199,21 +199,76 @@ echo "$npm_version"
 """
 
 [tasks.publish-swift]
-description = "Release the Swift package: tag vX.Y.Z on origin/main and push the tag"
+description = "Release the Swift package: tag vX.Y.Z on origin/main and create the GitHub release"
 dir = "{{ config_root }}"
 depends = ["check-version"]
 shell = "bash -c"
 run = """
 set -euo pipefail
-# SwiftPM releases are just semver tags on the repo; consumers pin
-# .package(url: ..., from: "X.Y.Z"). Tag the pushed main, not local state.
+# SwiftPM releases are semver tags on the repo; consumers pin
+# .package(url: ..., from: "X.Y.Z"). Tag the pushed main, not local state, then
+# create the GitHub Release object so the release is visible on github.com.
 VERSION=$(sed -n 's/^  "version": "\\([^"]*\\)",$/\\1/p' packages/redact-node/package.json)
+TAG="v$VERSION"
+REPO="Desert-Ant-Labs/redact"
+
 jj git fetch
 COMMIT=$(jj log -r main@origin --no-graph -T commit_id)
 [ -n "$COMMIT" ] || { echo "error: no main@origin bookmark" >&2; exit 1; }
-git tag "v$VERSION" "$COMMIT"
-git push origin "v$VERSION"
-echo "published: Swift package tag v$VERSION -> $COMMIT"
+
+# Local tag may already exist from an interrupted or repeated release. It is ok
+# only if it already points at the commit we are publishing.
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+    existing=$(git rev-parse "refs/tags/$TAG^{commit}")
+    [ "$existing" = "$COMMIT" ] || {
+        echo "error: local tag $TAG points at $existing, expected $COMMIT" >&2
+        exit 1
+    }
+else
+    git tag "$TAG" "$COMMIT"
+fi
+
+# Remote tag may also already exist. Verify it rather than force-pushing.
+remote=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}')
+if [ -n "$remote" ]; then
+    [ "$remote" = "$COMMIT" ] || {
+        echo "error: remote tag $TAG points at $remote, expected $COMMIT" >&2
+        exit 1
+    }
+    echo "tag exists: $TAG -> $COMMIT"
+else
+    git push origin "$TAG"
+    echo "pushed tag: $TAG -> $COMMIT"
+fi
+
+notes=$(mktemp)
+trap 'rm -f "$notes"' EXIT
+cat > "$notes" <<EOF
+Redact $VERSION release.
+
+## Packages
+
+- SwiftPM: https://github.com/Desert-Ant-Labs/redact.git, from $VERSION
+- Android: ai.desertant:redact:$VERSION
+- Android bundled model resources: ai.desertant:redact-onnx-resources:$VERSION
+- npm: @desert-ant-labs/redact@$VERSION
+
+## Highlights
+
+- One shared Swift redaction core for Apple platforms, Android, and WebAssembly.
+- On-demand model download and caching by default on all platforms.
+- Optional bundled model resources for fully offline Swift and Android apps.
+- Consistent public APIs across Swift, Kotlin, and JavaScript.
+- Reversible placeholders for LLM workflows, for example [EMAIL_1] and [BANK_ACCOUNT_1].
+EOF
+
+if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+    echo "release exists: https://github.com/$REPO/releases/tag/$TAG"
+else
+    gh release create "$TAG" --repo "$REPO" --title "Redact $VERSION" --notes-file "$notes"
+fi
+
+echo "published: Swift package release $TAG -> $COMMIT"
 """
 
 [tasks.publish-android]
