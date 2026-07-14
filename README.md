@@ -13,16 +13,18 @@ Email [GIVEN_NAME_1] [SURNAME_1] at [EMAIL_1].
 - [Swift](#swift)
   - [Install](#install)
   - [Usage](#usage)
+  - [Example](#example)
 - [Android](#android)
   - [Install](#install-1)
   - [Usage](#usage-1)
+  - [Example](#example-1)
 - [JavaScript and TypeScript](#javascript-and-typescript)
   - [Install](#install-2)
   - [Usage](#usage-2)
+  - [Example](#example-2)
 - [Reversible redaction for LLMs](#reversible-redaction-for-llms)
 - [Categories](#categories)
 - [Model and caching](#model-and-caching)
-- [Examples](#examples)
 - [License](#license)
 
 ## Features
@@ -105,6 +107,10 @@ import RedactCoreMLResources
 
 let redact = Redact(bundle: RedactCoreMLResourcesBundle.bundle)
 ```
+
+### Example
+
+A SwiftUI example app is included in `Examples/RedactExample`. Open `Examples/RedactExample/RedactExample.xcodeproj` in Xcode and run.
 
 ## Android
 
@@ -194,6 +200,10 @@ val explicit = Redact(context, directory = modelDir) // explicit model directory
 val offline = Redact.bundled()                       // needs redact-onnx-resources
 ```
 
+### Example
+
+An Android example app will live in this repository alongside the Swift and JavaScript examples.
+
 ## JavaScript and TypeScript
 
 ### Install
@@ -259,6 +269,10 @@ import { Redact } from "@desert-ant-labs/redact";
 const redact = await Redact.load({ ort });
 ```
 
+### Example
+
+JavaScript examples are in `Examples/RedactWasmExample`. The npm-specific quick start that is published to npm is in `packages/redact-node/README.md`.
+
 ## Reversible redaction for LLMs
 
 All platforms return the same redaction shape: masked text, ordered items, and a `restore` helper.
@@ -287,12 +301,6 @@ Default behavior:
 - JavaScript: downloads the ONNX model on `Redact.load()` to the managed cache in Node or browser cache storage when available.
 
 Passing an explicit `directory` makes that directory the model home. Existing valid files are adopted for offline use; otherwise Redact downloads into that directory and reuses it later.
-
-## Examples
-
-A SwiftUI example app is included in `Examples/RedactExample`. Open `Examples/RedactExample/RedactExample.xcodeproj` in Xcode and run.
-
-The JavaScript package README in `packages/redact-node` contains the npm-specific quick start that is published to npm.
 
 ## License
 
