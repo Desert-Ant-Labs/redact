@@ -116,7 +116,7 @@ A SwiftUI example app is included in `Examples/RedactExample`. Open `Examples/Re
 
 ### Install
 
-Requirements: Android API 24+. The AAR contains prebuilt arm64-v8a and x86_64 native libraries.
+Requirements: Android API 31+. The AAR contains prebuilt arm64-v8a and x86_64 native libraries.
 
 Redact is published to Maven Central.
 
@@ -202,7 +202,12 @@ val offline = Redact.bundled()                       // needs redact-onnx-resour
 
 ### Example
 
-An Android example app will live in this repository alongside the Swift and JavaScript examples.
+An Android example app is included in `Examples/RedactAndroidExample`. It uses the Maven Central package `ai.desertant:redact` and downloads the model on first use. Run it with:
+
+```bash
+cd Examples/RedactAndroidExample
+./gradlew :app:installDebug
+```
 
 ## JavaScript and TypeScript
 

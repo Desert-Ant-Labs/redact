@@ -1,5 +1,7 @@
 .build/
 .swiftpm/
+**/.gradle/
+**/build/
 # Compiled WebAssembly (built by `mise run build-web`)
 *.wasm
 .DS_Store
