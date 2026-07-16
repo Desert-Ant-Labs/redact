@@ -40,7 +40,16 @@ const core = await instantiateCore();
 // inject a module via `options.litert` (tests/custom builds) and override the
 // Wasm directory via `options.litertWasmDir`.
 async function loadLiteRtModule(options) {
-  return options.litert ?? (await import("@litertjs/core"));
+  if (options.litert) return options.litert;
+  try {
+    return await import("@litertjs/core");
+  } catch (e) {
+    throw new Error(
+      "@desert-ant-labs/redact: the browser build needs LiteRT.js. Install it as a peer " +
+        "dependency: `npm i @desert-ant-labs/redact @litertjs/core`. " +
+        "(In Node, import the package normally to use the native server-side build instead.)",
+      { cause: e });
+  }
 }
 
 async function resolveWasmDir(options) {

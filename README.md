@@ -45,7 +45,7 @@ Requirements: iOS 16+, macOS 13+, tvOS 16+, visionOS 1+, and Swift 5.9+.
 Add Redact with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.4.0")
+.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.5.0")
 ```
 
 Then add the `Redact` product to your app target.
@@ -116,7 +116,7 @@ let redact = Redact(bundle: RedactCoreMLResourcesBundle.bundle)
 
 ### Install
 
-Requirements: Android API 31+. The AAR contains prebuilt arm64-v8a and x86_64 native libraries.
+Requirements: Android API 24+. The AAR contains prebuilt arm64-v8a and x86_64 native libraries.
 
 Redact is published to Maven Central.
 
@@ -131,7 +131,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts
 dependencies {
-    implementation("ai.desertant:redact:0.4.0")
+    implementation("ai.desertant:redact:0.5.0")
 }
 ```
 
@@ -139,8 +139,8 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("ai.desertant:redact:0.4.0")
-    implementation("ai.desertant:redact-tflite-resources:0.4.0")
+    implementation("ai.desertant:redact:0.5.0")
+    implementation("ai.desertant:redact-tflite-resources:0.5.0")
 }
 ```
 

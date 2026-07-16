@@ -52,11 +52,17 @@ let package = Package(
         .library(name: "RedactTFLiteResources", targets: ["RedactTFLiteResources"]),
         // Android JNI library (built by `mise run android-natives`).
         .library(name: "RedactAndroid", type: .dynamic, targets: ["RedactAndroid"]),
+        // Native library for the Node.js server-side backend (built by
+        // `mise run node-natives`). Shares the RedactAndroid target: on a host
+        // (Linux/macOS) triple only the C ABI in `CABI.swift` compiles, since
+        // `AndroidJNI.swift` is `#if os(Android)`, so koffi in packages/redact-node
+        // binds the `redact_*` C ABI over the resulting libRedactNode.
+        .library(name: "RedactNode", type: .dynamic, targets: ["RedactAndroid"]),
     ] + wasmProducts,
     dependencies: [
         // Reusable cross-platform primitives (Regex, JSON, TextNormalization,
         // ModelStore, FFIBuffer, HostBridge, CHostBridge).
-        .package(url: "https://github.com/Desert-Ant-Labs/desert-ant-core.git", from: "0.2.4"),
+        .package(url: "https://github.com/Desert-Ant-Labs/desert-ant-core.git", from: "0.3.0"),
         // Portable `Double.exp` for the softmax (stdlib has no transcendentals;
         // this avoids a per-platform libm import and Foundation on Android/wasm).
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),

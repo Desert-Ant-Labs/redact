@@ -1,14 +1,20 @@
-// The redact-node test suite. Runs through the WebAssembly runtime with model
-// files loaded from the local LiteRT resources instead of the Hugging Face Hub.
+// The redact-node test suite. Runs server-side in Node against the native core
+// (the `node` conditional-exports entry), with model files loaded from the local
+// LiteRT resources instead of the Hugging Face Hub. The browser entry
+// (WebAssembly + LiteRT.js) is exercised by the headless-Chromium example.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Redact } from "../index.js";
+import { Redact } from "../node.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const directory = path.join(here, "../../../Sources/RedactTFLiteResources/Resources");
+// The native core uses each OS's runtime: Core ML (.mlmodelc) on macOS, LiteRT
+// (.tflite) on Linux. Point at the matching bundled resources so the test runs
+// real on-device inference offline on either host.
+const resources = process.platform === "darwin" ? "RedactCoreMLResources" : "RedactTFLiteResources";
+const directory = path.join(here, `../../../Sources/${resources}/Resources`);
 
 let redact;
 let loadError;
@@ -17,7 +23,7 @@ try {
 } catch (e) {
   loadError = e;
 }
-const modelOpts = redact ? {} : { skip: `model unavailable: ${String(loadError).slice(0, 80)}` };
+const modelOpts = redact ? {} : { skip: `native model unavailable: ${String(loadError).slice(0, 100)}` };
 
 test("redaction masks names, email, IBAN", modelOpts, async () => {
   const r = await redact.redaction("Email Anna Kovács at anna@example.hu, IBAN DE89370400440532013000.");

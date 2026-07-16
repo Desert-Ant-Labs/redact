@@ -1,17 +1,24 @@
 # @desert-ant-labs/redact
 
-On-device multilingual PII redaction for JavaScript (node and browsers). Finds
-names, addresses, emails, phone numbers, cards, IBANs, national IDs and more
-across the 24 official EU languages, fully locally: the package runs through a
-local WebAssembly runtime with inference via LiteRT.js (`@litertjs/core`).
+On-device multilingual PII redaction for JavaScript that runs **the same code in
+the browser and server-side in Node**. Finds names, addresses, emails, phone
+numbers, cards, IBANs, national IDs and more across the 24 official EU languages,
+fully locally.
 
-Inference runs in the browser (LiteRT.js is a browser runtime, using an
-XNNPACK-accelerated CPU path by default and optional WebGPU). In plain Node the
-WebAssembly pipeline still loads, but the model session is unavailable, so use
-this in a browser (or a browser-like environment) for redaction.
+One import, resolved automatically by conditional exports:
+
+- **Browser** (bundlers, `import` in a web app): a local WebAssembly pipeline
+  with [LiteRT.js](https://www.npmjs.com/package/@litertjs/core) inference
+  (XNNPACK-accelerated CPU by default, optional WebGPU).
+- **Node** (server-side): a prebuilt native core (LiteRT on Linux, Core ML on
+  macOS). No build tools, no flags.
 
 ```bash
-npm install @desert-ant-labs/redact @litertjs/core
+# Browser builds:
+npm i @desert-ant-labs/redact @litertjs/core
+
+# Node only:
+npm i @desert-ant-labs/redact
 ```
 
 ```js
@@ -24,19 +31,23 @@ r.redactedText;      // "Email [GIVEN_NAME_1] at [EMAIL_1]."
 r.items;             // detections: label, original, placeholder, confidence, offsets
 const reply = await llm(r.redactedText);       // the LLM sees only placeholders
 r.restore(reply);    // originals filled back in
+
+redact.dispose();    // (Node) free the native handle when done; no-op in the browser
 ```
 
 `Redact.load()` accepts:
 
-- `directory` (node): an explicit model directory; files already there are used
+- `directory` (Node): an explicit model directory; files already there are used
   offline, otherwise the model is downloaded into it. Omit for the managed
   cache (`~/.cache/desert-ant-models/...`).
+- `cacheRoot` (Node): base directory for the managed cache (default `~/.cache`).
 - `onProgress`: download progress callback, fraction in `[0, 1]`.
-- `litert`: bring-your-own LiteRT.js module (the `@litertjs/core` namespace,
-  e.g. a bundler-managed import).
-- `litertWasmDir`: URL/path to the LiteRT.js Wasm files (defaults to the
-  installed package, or the jsDelivr CDN in the browser).
-- `accelerator`: `"wasm"` (XNNPACK CPU, default), `"webgpu"`, or `"webnn"`.
+- `litert` (browser): bring-your-own LiteRT.js module (the `@litertjs/core`
+  namespace, e.g. a bundler-managed import).
+- `litertWasmDir` (browser): URL/path to the LiteRT.js Wasm files (defaults to
+  the installed package, or the jsDelivr CDN in the browser).
+- `accelerator` (browser): `"wasm"` (XNNPACK CPU, default), `"webgpu"`, or
+  `"webnn"`.
 
 The model repo and revision are pinned to the package version. `@litertjs/core`
 is an optional peer dependency.

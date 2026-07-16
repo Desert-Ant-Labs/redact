@@ -12,6 +12,7 @@ Vendor/
 Examples/RedactWasmExample/node_modules/
 Examples/RedactWasmExample/package-lock.json
 packages/redact-node/dist/
+packages/redact-node/native/
 packages/redact-node/node_modules/
 packages/redact-node/LICENSE.md
 packages/redact-kotlin/src/main/jniLibs/

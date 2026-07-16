@@ -48,7 +48,10 @@ export interface LoadOptions {
   directory?: string;
   /** Download progress in `[0, 1]`, called during {@link Redact.load}. */
   onProgress?: (fraction: number) => void;
-  /** Bring-your-own LiteRT.js module (the `@litertjs/core` namespace). */
+  /** Base directory for the managed cache (Node, server-side). Defaults to
+   * `~/.cache`. Ignored in the browser. */
+  cacheRoot?: string;
+  /** Bring-your-own LiteRT.js module (the `@litertjs/core` namespace). Browser only. */
   litert?: unknown;
   /** URL/path to the LiteRT.js Wasm directory (defaults: installed package in
    * node, jsDelivr CDN in the browser). */
@@ -58,9 +61,10 @@ export interface LoadOptions {
 }
 
 /**
- * On-device multilingual PII redaction for JavaScript with local WebAssembly
- * and LiteRT.js inference. Create one with `await Redact.load(...)` and
- * reuse it.
+ * On-device multilingual PII redaction for JavaScript. The same import runs in
+ * the browser (WebAssembly + LiteRT.js) and server-side in Node (a prebuilt
+ * native core), selected automatically by conditional exports. Create one with
+ * `await Redact.load(...)` and reuse it.
  *
  * ```ts
  * const redact = await Redact.load();
@@ -77,4 +81,6 @@ export declare class Redact {
    * safe to hand to an LLM and restore afterwards via {@link Redaction.restore}.
    */
   redaction(text: string, options?: Options): Promise<Redaction>;
+  /** Free the native handle (Node). No-op in the browser. Call when done. */
+  dispose(): void;
 }

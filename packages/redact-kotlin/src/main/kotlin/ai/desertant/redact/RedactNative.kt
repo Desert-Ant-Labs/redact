@@ -9,7 +9,7 @@ import ai.desertant.core.HostBridge
  * crosses as UTF-8 bytes; the redaction result comes back as an FFIBuffer typed
  * binary buffer.
  *
- * `regexMatches` / `jsonParseTree` / `httpTree` / `httpDownload` are the host
+ * `regexMatches` / `jsonParseTree` / `normalizeNfkc` / `httpTree` / `httpDownload` are the host
  * callbacks the native runtime looks up on this class. They forward to
  * `ai.desertant.core.HostBridge`.
  */
@@ -48,4 +48,7 @@ internal object RedactNative {
 
     @JvmStatic
     fun httpDownload(urlUtf8: ByteArray, destUtf8: ByteArray): Int = HostBridge.httpDownload(urlUtf8, destUtf8)
+
+    @JvmStatic
+    fun normalizeNfkc(textUtf8: ByteArray): ByteArray = HostBridge.normalizeNfkc(textUtf8)
 }
