@@ -1,6 +1,6 @@
 {
   "name": "@desert-ant-labs/redact",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "On-device multilingual PII redaction for JavaScript. Runs in the browser (WebAssembly + LiteRT.js) and server-side in Node (native), from one import.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.md",
@@ -24,24 +24,38 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "./node.js",
+  "main": "./browser.js",
   "browser": "./browser.js",
   "types": "./index.d.ts",
   "scripts": {
-    "test": "node --test test/redact.test.mjs test/browser-missing-litert.test.mjs"
+    "test": "node --test test/redact.test.mjs test/browser-in-node.test.mjs"
   },
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "browser": "./browser.js",
-      "node": "./node.js",
+      "default": "./browser.js"
+    },
+    "./native": {
+      "types": "./index.d.ts",
+      "default": "./node.js"
+    },
+    "./browser": {
+      "types": "./index.d.ts",
       "default": "./browser.js"
     },
     "./wasm": "./dist/RedactWeb.wasm"
   },
+  "imports": {
+    "#platform": {
+      "browser": "./platform-browser.js",
+      "default": "./platform-node.js"
+    }
+  },
   "files": [
     "browser.js",
     "node.js",
+    "platform-browser.js",
+    "platform-node.js",
     "index.d.ts",
     "dist",
     "native",
@@ -49,7 +63,9 @@
     "README.md"
   ],
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.3.0",
+    "@bjorn3/browser_wasi_shim": "^0.3.0"
+  },
+  "optionalDependencies": {
     "koffi": "^2.9.0"
   },
   "peerDependencies": {

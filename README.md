@@ -45,7 +45,7 @@ Requirements: iOS 16+, macOS 13+, tvOS 16+, visionOS 1+, and Swift 5.9+.
 Add Redact with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.6.3")
+.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.7.0")
 ```
 
 Then add the `Redact` product to your app target.
@@ -131,7 +131,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts
 dependencies {
-    implementation("ai.desertant:redact:0.6.3")
+    implementation("ai.desertant:redact:0.7.0")
 }
 ```
 
@@ -139,7 +139,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("ai.desertant:redact:0.6.3") {
+    implementation("ai.desertant:redact:0.7.0") {
         exclude(group = "ai.desertant", module = "redact-tflite-resources")
     }
 }
@@ -211,18 +211,22 @@ val offline = Redact.bundled()                       // explicit bundled constru
 
 ### Install
 
-Requirements: a browser (or browser-like) runtime with `@litertjs/core` (LiteRT.js). Inference runs in the browser (XNNPACK-accelerated CPU by default, optional WebGPU); in plain Node the pipeline loads but the model session is unavailable.
+Two entries share one `Redact` API. The default `@desert-ant-labs/redact` is the browser build (WebAssembly + LiteRT.js, XNNPACK-accelerated CPU by default, optional WebGPU); it has no native dependencies, so it bundles cleanly for every target of a multi-target bundler (Next.js, Remix, SvelteKit, Nuxt), including the browser bundle and the Client-Component SSR pass those frameworks render in Node. `@desert-ant-labs/redact/native` is a prebuilt native core for server-side inference in Node.
 
 ```bash
+# Browser (default entry):
 npm install @desert-ant-labs/redact @litertjs/core
+
+# Server-side inference in Node (/native entry) needs no extra install:
+npm install @desert-ant-labs/redact
 ```
 
-`@litertjs/core` is an optional peer dependency.
+`@litertjs/core` is an optional peer dependency (browser build only). The default import is safe to *import* during server-side rendering, but LiteRT.js initializes only in a browser or Web Worker, so `Redact.load()` runs inference in the browser; in plain Node it throws an actionable error pointing you to `@desert-ant-labs/redact/native`. The native build ships for linux-x64, linux-arm64 (LiteRT), and darwin-arm64 (Core ML).
 
 ### Usage
 
 ```js
-import { Redact } from "@desert-ant-labs/redact";
+import { Redact } from "@desert-ant-labs/redact";       // browser; use "@desert-ant-labs/redact/native" server-side
 
 const redact = await Redact.load();
 const result = await redact.redaction("Email Anna at anna@example.com.");
@@ -248,14 +252,14 @@ const result = await redact.redaction(text, {
 
 Unlike the Swift and Android packages, the JavaScript package does not bundle the
 model: `Redact.load()` downloads it from the Hugging Face Hub at the SDK's pinned
-tag on first use and caches it (the OS cache dir in Node, the fetch cache in the
-browser). To self-host or run offline, pass `directory` (Node) or `modelBaseUrl`
-(browser):
+tag on first use and caches it (the OS cache dir for the native build, the fetch
+cache in the browser). To self-host or run offline, pass `directory` (native
+build) or `modelBaseUrl` (browser):
 
 ```js
 const redact = await Redact.load({
-  directory: "/var/cache/redact",       // Node: adopt/download files here
-  modelBaseUrl: "/assets/redact/",      // Browser: serve the files yourself
+  directory: "/var/cache/redact",       // native build: adopt/download files here
+  modelBaseUrl: "/assets/redact/",      // browser: serve the files yourself
   onProgress: (fraction) => console.log(fraction),
 });
 ```
