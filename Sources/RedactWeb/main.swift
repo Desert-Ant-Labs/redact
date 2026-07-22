@@ -1,4 +1,5 @@
 #if os(WASI)
+import Inference
 import JavaScriptEventLoop
 import JavaScriptKit
 @_spi(RedactBindings) import Redact
@@ -10,6 +11,7 @@ import JavaScriptKit
 //
 //     globalThis.__RedactExports = {
 //       load(cacheRoot, directory?, onProgress?)    -> Promise<boolean>,
+//       loadBundled(labelsJSON, tokenizerBytes)     -> Promise<boolean>,
 //       redaction(text, minimumConfidence, labels?) -> Promise<{redactedText, items}>,
 //     }
 //
@@ -86,8 +88,40 @@ let loadFn = JSClosure { args in
     }.jsValue
 }
 
+// loadBundled(labelsJSON, tokenizerBytes): wire self-hosted model files (the JS
+// host's `modelBaseUrl` opt-out). The host has already compiled the model into
+// its LiteRT.js session (createSession/loadAndCompile), so only the labels and
+// tokenizer sidecars cross into wasm here; the multi-MB model bytes never do
+// (they stay on the JS side).
+private func typedArrayBytes(_ value: JSValue?) -> [UInt8]? {
+    guard let value, let array = JSTypedArray<UInt8>(from: value) else { return nil }
+    return array.withUnsafeBytes { Array($0) }
+}
+
+let loadBundledFn = JSClosure { args in
+    let labelsJSON = args.first?.string
+    let tokenizer = typedArrayBytes(args.count > 1 ? args[1] : nil)
+    return JSPromise { resolve in
+        Task {
+            do {
+                guard let labelsJSON, let tokenizer else { throw RedactError.resourceMissing }
+                let assets = try ModelAssets(
+                    tokenizer: tokenizer, labelsJSON: labelsJSON,
+                    session: JSInferenceSession(hostGlobal: "__RedactHost"))
+                let redact = Redact(assets: assets)
+                try await redact.waitUntilLoaded()
+                redactor = redact
+                resolve(.success(.boolean(true)))
+            } catch {
+                resolve(.failure(.string(String(describing: error))))
+            }
+        }
+    }.jsValue
+}
+
 let exports = JSObject.global.Object.function!.new()
 exports.load = .object(loadFn)
+exports.loadBundled = .object(loadBundledFn)
 exports.redaction = .object(redactionFn)
 JSObject.global.__RedactExports = .object(exports)
 #endif

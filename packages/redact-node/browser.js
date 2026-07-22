@@ -7,8 +7,8 @@
 
 const IS_NODE = typeof process !== "undefined" && !!process.versions?.node;
 
-// The wasm core instantiates at import time (top-level await) so the
-// deterministic exports are synchronous; the model is only wired in load().
+// The wasm core instantiates at import time (top-level await); the model is
+// only wired in load().
 async function instantiateCore() {
   globalThis.__RedactHost ??= {};
   const { instantiate } = await import("./dist/instantiate.js");
@@ -43,12 +43,21 @@ async function loadLiteRtModule(options) {
   if (options.litert) return options.litert;
   try {
     return await import("@litertjs/core");
-  } catch (e) {
+  } catch (cause) {
+    // Only surface the install hint when @litertjs/core is genuinely absent;
+    // rethrow anything else (a real error from inside LiteRT.js) unchanged.
+    const missingLiteRt =
+      cause?.code === "ERR_MODULE_NOT_FOUND" ||
+      cause?.code === "MODULE_NOT_FOUND" ||
+      String(cause?.message ?? "").includes("@litertjs/core");
+    if (!missingLiteRt) throw cause;
     throw new Error(
-      "@desert-ant-labs/redact: the browser build needs LiteRT.js. Install it as a peer " +
-        "dependency: `npm i @desert-ant-labs/redact @litertjs/core`. " +
+      "@desert-ant-labs/redact browser runtime requires @litertjs/core. " +
+        "Install it with: npm i @desert-ant-labs/redact @litertjs/core. " +
+        "If you already bundle LiteRT.js yourself, pass it to Redact.load({ litert }). " +
         "(In Node, import the package normally to use the native server-side build instead.)",
-      { cause: e });
+      { cause },
+    );
   }
 }
 
@@ -91,9 +100,11 @@ async function ensureLiteRt(options, lrt) {
  */
 export class Redact {
   /**
-   * Load the model and return a ready redactor. Download, SHA-256 verification,
-   * and caching are handled by the runtime; this host owns the LiteRT.js session
-   * behind the generic tensor contract (createSession + run). The repo and
+   * Load the model and return a ready redactor. By default the runtime downloads
+   * the model from the Hugging Face Hub at the SDK's pinned tag (fetched + cached
+   * by the browser) and this host owns the LiteRT.js session behind the generic
+   * tensor contract (createSession + run). Pass `modelBaseUrl` (a base URL you
+   * serve the files from) to self-host / run without the Hub. The repo and
    * revision are pinned to the SDK.
    */
   static async load(options = {}) {
@@ -156,16 +167,30 @@ export class Redact {
       },
     };
 
-    // Base for the managed nested cache (node): ~/.cache. In the browser there
-    // is no persistent filesystem, so it stays empty (in-memory).
-    let cacheRoot = "";
-    if (IS_NODE) {
-      const os = await import("node:os");
-      const path = await import("node:path");
-      cacheRoot = path.join(os.homedir(), ".cache");
-    }
     const onProgress = typeof resolved.onProgress === "function" ? resolved.onProgress : undefined;
-    await core.load(cacheRoot, resolved.directory ?? "", onProgress);
+    if (resolved.modelBaseUrl != null) {
+      // Self-hosted files (offline / no runtime CDN): fetch the model + sidecars
+      // from the given base URL, compile the model here, and hand the labels +
+      // tokenizer to the wasm core, no Hub download. This is the browser opt-out,
+      // e.g. an app that serves the model from its own origin.
+      const { labelsJSON, tokenizerBytes, modelBytes } = await fetchModelFrom(resolved.modelBaseUrl);
+      model = await loadAndCompile(modelBytes, { accelerator });
+      await core.loadBundled(labelsJSON, tokenizerBytes);
+      onProgress?.(1);
+    } else {
+      // Default: the runtime downloads this platform's files from the HF Hub at
+      // the pinned tag (SHA-256 verified), fetched + cached by the JS host, and
+      // wires the session through createSession above. `directory` (node) adopts
+      // a self-hosted folder. Base for the managed nested cache (node): ~/.cache;
+      // empty (in-memory) in the browser.
+      let cacheRoot = "";
+      if (IS_NODE) {
+        const os = await import("node:os");
+        const path = await import("node:path");
+        cacheRoot = path.join(os.homedir(), ".cache");
+      }
+      await core.load(cacheRoot, resolved.directory ?? "", onProgress);
+    }
     return new Redact();
   }
 
@@ -189,4 +214,20 @@ export class Redact {
       },
     };
   }
+}
+
+// Fetch self-hosted model files from a base URL (the `modelBaseUrl` opt-out).
+// Accepts absolute URLs and root-relative paths (e.g. "/assets/redact/").
+async function fetchModelFrom(baseUrl) {
+  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const [labels, tokenizer, model] = await Promise.all([
+    fetch(`${base}labels.json`).then((r) => r.text()),
+    fetch(`${base}redact_tokenizer.bin`).then((r) => r.arrayBuffer()),
+    fetch(`${base}redact.tflite`).then((r) => r.arrayBuffer()),
+  ]);
+  return {
+    labelsJSON: labels,
+    tokenizerBytes: new Uint8Array(tokenizer),
+    modelBytes: new Uint8Array(model),
+  };
 }

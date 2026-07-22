@@ -45,7 +45,7 @@ Requirements: iOS 16+, macOS 13+, tvOS 16+, visionOS 1+, and Swift 5.9+.
 Add Redact with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.5.0")
+.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.6.0")
 ```
 
 Then add the `Redact` product to your app target.
@@ -131,7 +131,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts
 dependencies {
-    implementation("ai.desertant:redact:0.5.0")
+    implementation("ai.desertant:redact:0.6.0")
 }
 ```
 
@@ -139,8 +139,8 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("ai.desertant:redact:0.5.0")
-    implementation("ai.desertant:redact-tflite-resources:0.5.0")
+    implementation("ai.desertant:redact:0.6.0")
+    implementation("ai.desertant:redact-tflite-resources:0.6.0")
 }
 ```
 
@@ -243,11 +243,16 @@ const result = await redact.redaction(text, {
 });
 ```
 
-Control loading:
+Unlike the Swift and Android packages, the JavaScript package does not bundle the
+model: `Redact.load()` downloads it from the Hugging Face Hub at the SDK's pinned
+tag on first use and caches it (the OS cache dir in Node, the fetch cache in the
+browser). To self-host or run offline, pass `directory` (Node) or `modelBaseUrl`
+(browser):
 
 ```js
 const redact = await Redact.load({
-  directory: "/var/cache/redact",       // Node only, optional
+  directory: "/var/cache/redact",       // Node: adopt/download files here
+  modelBaseUrl: "/assets/redact/",      // Browser: serve the files yourself
   onProgress: (fraction) => console.log(fraction),
 });
 ```

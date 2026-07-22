@@ -40,7 +40,10 @@ public struct ModelAssets: Sendable {
             session: try inferenceSession(modelBytes: modelBytes))
     }
 
-    init(tokenizer: [UInt8], labelsJSON: String, session: any InferenceSession) {
+    /// Bindings entry point: build from an already-constructed session (e.g. the
+    /// wasm host's `JSInferenceSession`) plus the sidecars.
+    @_spi(RedactBindings)
+    public init(tokenizer: [UInt8], labelsJSON: String, session: any InferenceSession) {
         self.tokenizer = tokenizer
         self.labelsJSON = labelsJSON
         self.session = session

@@ -38,14 +38,26 @@ export interface Options {
   labels?: Iterable<string>;
 }
 
-/** How the model is loaded. The repo and revision are pinned to the SDK. */
+/**
+ * How the model is loaded. The repo and revision are pinned to the SDK. By
+ * default the model is downloaded from the Hugging Face Hub at the pinned tag
+ * and cached (nothing is bundled in the npm package); use `directory` (Node) or
+ * `modelBaseUrl` (browser) to self-host / run offline.
+ */
 export interface LoadOptions {
   /**
-   * An explicit directory that is this model's home (node): if it already holds
+   * An explicit directory that is this model's home (Node): if it already holds
    * the files they are used offline, otherwise the model is downloaded into it.
-   * Omit to use the managed cache (`~/.cache/desert-ant-models/...`).
+   * Omit to download from the Hub into the managed cache
+   * (`~/.cache/desert-ant-models/...`).
    */
   directory?: string;
+  /**
+   * Base URL of self-hosted model files, e.g. `"/assets/redact/"` or
+   * `"https://cdn.example.com/redact/"` (browser). When set, the files load
+   * from there instead of the Hugging Face Hub. Browser only.
+   */
+  modelBaseUrl?: string;
   /** Download progress in `[0, 1]`, called during {@link Redact.load}. */
   onProgress?: (fraction: number) => void;
   /** Base directory for the managed cache (Node, server-side). Defaults to
@@ -73,7 +85,12 @@ export interface LoadOptions {
  * ```
  */
 export declare class Redact {
-  /** Load the model (Hugging Face Hub, cached, or a `directory`) and return a ready redactor. */
+  /**
+   * Load the model and return a ready redactor. By default it downloads from the
+   * Hugging Face Hub at the pinned tag on first call, verifies it (SHA-256), and
+   * caches it (nothing model-sized ships in the npm package). Pass `directory`
+   * (Node) or `modelBaseUrl` (browser) to self-host / run offline instead.
+   */
   static load(options?: LoadOptions): Promise<Redact>;
   /**
    * Detect and redact the PII in `text`. Each entity is replaced by a unique,
