@@ -45,7 +45,7 @@ Requirements: iOS 16+, macOS 13+, tvOS 16+, visionOS 1+, and Swift 5.9+.
 Add Redact with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.6.0")
+.package(url: "https://github.com/Desert-Ant-Labs/redact.git", from: "0.6.3")
 ```
 
 Then add the `Redact` product to your app target.
@@ -131,18 +131,21 @@ dependencyResolutionManagement {
 
 // build.gradle.kts
 dependencies {
-    implementation("ai.desertant:redact:0.6.0")
+    implementation("ai.desertant:redact:0.6.3")
 }
 ```
 
-`ai.desertant:redact` downloads the model on demand and caches it under the app cache directory. To ship the LiteRT model inside your APK or app bundle instead, add the resources artifact and use `Redact.bundled()`:
+`ai.desertant:redact` bundles the LiteRT model by default, so normal installs work offline. To disable bundling, exclude the transitive resources artifact:
 
 ```kotlin
 dependencies {
-    implementation("ai.desertant:redact:0.6.0")
-    implementation("ai.desertant:redact-tflite-resources:0.6.0")
+    implementation("ai.desertant:redact:0.6.3") {
+        exclude(group = "ai.desertant", module = "redact-tflite-resources")
+    }
 }
 ```
+
+With that exclusion, `Redact(context)` downloads on demand and caches the model. `Redact(context, directory = modelDir)` loads from or downloads into your chosen directory.
 
 ### Usage
 
@@ -150,7 +153,7 @@ dependencies {
 import ai.desertant.redact.Options
 import ai.desertant.redact.Redact
 
-val redact = Redact(context)                 // download on demand, cached
+val redact = Redact(context)                 // bundled model by default
 val result = redact.redaction("Email Anna at anna@example.com.")
 
 println(result.redactedText)
@@ -195,9 +198,9 @@ if (!redact.isDownloaded()) {
 Use an explicit model directory or bundled resources:
 
 ```kotlin
-val cached = Redact(context)                         // managed cache
+val cached = Redact(context)                         // bundled model by default
 val explicit = Redact(context, directory = modelDir) // explicit model directory
-val offline = Redact.bundled()                       // needs redact-tflite-resources
+val offline = Redact.bundled()                       // explicit bundled constructor
 ```
 
 ### Example
@@ -294,7 +297,7 @@ The model artifacts are published at [`desert-ant-labs/redact`](https://huggingf
 Default behavior:
 
 - Swift: downloads the Core ML model on demand to a managed cache, or uses bundled `RedactCoreMLResources`.
-- Android: downloads the LiteRT model on demand to app cache, or uses bundled `ai.desertant:redact-tflite-resources`.
+- Android: bundles the LiteRT model by default through the normal `ai.desertant:redact` dependency. Excluding `redact-tflite-resources` switches to on-demand download into app cache.
 - JavaScript: downloads the LiteRT model on `Redact.load()` to the managed cache in Node or browser cache storage when available.
 
 Passing an explicit `directory` makes that directory the model home. Existing valid files are adopted for offline use; otherwise Redact downloads into that directory and reuses it later.

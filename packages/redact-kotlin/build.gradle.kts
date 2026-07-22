@@ -4,9 +4,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // Android library (AAR) with prebuilt native libraries. Gradle drives the
 // native build: `apply(from = "swift-android.gradle.kts")` runs `mise run
 // android-natives` (static-stdlib Swift JNI + LiteRT) before packaging,
-// dropping the per-ABI libRedactAndroid.so into src/main/jniLibs. This AAR
-// ships no model: it downloads on demand by default. Bundling is opt-in via
-// the `:redact-tflite-resources` artifact.
+// dropping the per-ABI libRedactAndroid.so into src/main/jniLibs. Redact bundles
+// the LiteRT resources by default so normal installs work offline. Consumers who
+// want download-on-demand can exclude the transitive resources artifact.
 //
 // Publishing: the AAR contains a prebuilt Swift native, so JitPack (which
 // builds from source) cannot produce it. `mise run publish-android` publishes
@@ -23,7 +23,7 @@ plugins {
 apply(from = "swift-android.gradle.kts")
 
 group = "ai.desertant"
-version = "0.6.0"
+version = "0.6.3"
 
 android {
     namespace = "ai.desertant.redact"
@@ -52,12 +52,14 @@ kotlin {
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    // Redact bundles the LiteRT resources by default so normal installs work
+    // offline, matching Emo and Shapes. Consumers who want download-on-demand
+    // exclude this transitive artifact.
+    implementation(project(":redact-tflite-resources"))
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-    // Bundle the model for the instrumented bundled-model tests.
-    androidTestImplementation(project(":redact-tflite-resources"))
 }
 
 mavenPublishing {

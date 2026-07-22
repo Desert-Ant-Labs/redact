@@ -56,7 +56,7 @@ class RedactException(message: String) : Exception(message)
  * eagerly via [download]).
  *
  * ```kotlin
- * val redact = Redact(context)                 // download on demand, cached
+ * val redact = Redact(context)                 // bundled model by default
  * val r = redact.redaction("Email Anna at anna@example.com.")
  * r.redactedText            // "Email [GIVEN_NAME_1] at [EMAIL_1]."
  * redact.close()
@@ -64,26 +64,34 @@ class RedactException(message: String) : Exception(message)
  */
 class Redact private constructor(private val handle: Long) : AutoCloseable {
     /**
-     * A redactor that downloads the model on demand (cached under the app's
-     * cacheDir), or, when [directory] is given, treats that directory as the
-     * model's home (adopt files there, else download into it). Construction is
-     * cheap; the model loads on the first [redaction] (or eagerly via [download]).
+     * A redactor using the bundled model by default. When [directory] is
+     * supplied, that directory is treated as the model's home instead (adopt
+     * files there, else download into it). Construction is cheap; the model
+     * loads on the first [redaction] (or eagerly via [download]).
      */
     constructor(context: android.content.Context, directory: String? = null)
-        : this(createHandle(context.cacheDir.absolutePath, directory))
+        : this(if (directory == null) bundledHandleOrNull() ?: createHandle(context.cacheDir.absolutePath, null)
+               else createHandle(context.cacheDir.absolutePath, directory))
 
     companion object {
         /**
-         * A redactor using the model bundled in your app via the
-         * `ai.desertant:redact-tflite-resources` dependency (no network).
+         * A redactor using the bundled model (no network). The main Redact AAR
+         * depends on the resources artifact by default; this remains useful for
+         * explicit offline construction.
          */
         fun bundled(): Redact {
-            RedactNative.ensureLoaded()
-            val handle = RedactNative.createBundled(
-                resource("redact_tokenizer.bin"), resource("labels.json"), resource("redact.tflite"))
-            if (handle == 0L) throw RedactException(
-                "bundled model unavailable; add the `ai.desertant:redact-tflite-resources` dependency")
+            val handle = bundledHandleOrNull() ?: throw RedactException(
+                "bundled model unavailable; make sure `ai.desertant:redact-tflite-resources` is present")
             return Redact(handle)
+        }
+
+        private fun bundledHandleOrNull(): Long? {
+            RedactNative.ensureLoaded()
+            val tokenizer = resourceOrNull("redact_tokenizer.bin") ?: return null
+            val labels = resourceOrNull("labels.json") ?: return null
+            val model = resourceOrNull("redact.tflite") ?: return null
+            val handle = RedactNative.createBundled(tokenizer, labels, model)
+            return handle.takeIf { it != 0L }
         }
 
         private fun createHandle(cacheRoot: String, directory: String?): Long {
@@ -94,12 +102,8 @@ class Redact private constructor(private val handle: Long) : AutoCloseable {
             return handle
         }
 
-        private fun resource(name: String): ByteArray =
-            (Redact::class.java.getResourceAsStream("/$name")
-                ?: throw RedactException(
-                    "bundled model resource not found: $name. Add the " +
-                        "`ai.desertant:redact-tflite-resources` dependency, or use Redact(context)."))
-                .use { it.readBytes() }
+        private fun resourceOrNull(name: String): ByteArray? =
+            Redact::class.java.getResourceAsStream("/$name")?.use { it.readBytes() }
     }
 
     /** Whether the model is available for this redactor with no network. */
