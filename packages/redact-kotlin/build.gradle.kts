@@ -50,8 +50,11 @@ kotlin {
 }
 
 dependencies {
+    // Reusable Android host bridge (ai.desertant.core.HostBridge + FfiReader),
+    // shared across the Desert Ant model SDKs. Brings kotlinx-serialization-json
+    // transitively (HostBridge parses the Hub tree JSON with it).
+    implementation("ai.desertant:core:0.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     // Redact bundles the LiteRT resources by default so normal installs work
     // offline, matching Emo and Shapes. Consumers who want download-on-demand
     // exclude this transitive artifact.
